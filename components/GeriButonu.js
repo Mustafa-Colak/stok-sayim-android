@@ -1,7 +1,8 @@
 import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { View, Text, TouchableOpacity } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
+import styles from "../styles/GeriButonuStyles";
 
 export default function GeriButonu({ yazi = "Geri" }) {
   const navigation = useNavigation();
@@ -17,17 +18,3 @@ export default function GeriButonu({ yazi = "Geri" }) {
     </TouchableOpacity>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-  },
-  text: {
-    fontSize: 18,
-    marginLeft: 8,
-    color: "#333",
-  },
-});

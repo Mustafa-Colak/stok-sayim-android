@@ -1,11 +1,22 @@
+// e:\edev\stok-sayim\screens\YeniSayim.js
 import React, { useState, useEffect } from "react";
-import { View, Text, TextInput, Button, FlatList, Alert } from "react-native";
+import {
+  View,
+  Text,
+  TextInput,
+  Button,
+  FlatList,
+  Alert,
+  TouchableOpacity,
+} from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 
-import common from "../styles/CommonStyles";
+import commonStyles from "../styles/CommonStyles"; // commonStyles olarak import ettim
+import yeniSayimStyles from "../styles/YeniSayimStyles"; // yeniSayimStyles olarak import ettim
 
 export default function YeniSayim({ navigation }) {
-  const [sayimAdi, setSayimAdi] = useState("");
+  const [sayimNotu, setSayimNotu] = useState("");
   const [oncekiSayimlar, setOncekiSayimlar] = useState([]);
 
   useEffect(() => {
@@ -14,7 +25,10 @@ export default function YeniSayim({ navigation }) {
         const veri = await AsyncStorage.getItem("sayimlar");
         if (veri) {
           const liste = JSON.parse(veri);
-          setOncekiSayimlar(liste.reverse());
+          // En son eklenenler üstte olacak şekilde sırala
+          setOncekiSayimlar(
+            liste.sort((a, b) => new Date(b.tarih) - new Date(a.tarih))
+          );
         }
       } catch (e) {
         Alert.alert("Hata", "Sayım listesi yüklenemedi.");
@@ -24,81 +38,129 @@ export default function YeniSayim({ navigation }) {
   }, []);
 
   const sayimEkle = async () => {
-    if (!sayimAdi.trim()) {
-      Alert.alert("Uyarı", "Sayım adı boş olamaz.");
+    if (!sayimNotu.trim()) {
+      Alert.alert("Uyarı", "Sayım notu boş olamaz.");
       return;
     }
 
-    // Tarih formatını _DDMMYY şeklinde oluştur
     const now = new Date();
     const gun = String(now.getDate()).padStart(2, "0");
-    const ay = String(now.getMonth() + 1).padStart(2, "0");
+    const ay = String(now.getMonth() + 1).padStart(2, "0"); // Aylar 0'dan başlar
     const yil = String(now.getFullYear()).slice(-2);
     const tarihEki = `_${gun}${ay}${yil}`;
-
-    // Sayım adına tarih ekini ekle
-    const sayimAdiTarihli = sayimAdi.trim() + tarihEki;
-
+    const sayimNotuTarihli = sayimNotu.trim() + tarihEki;
     const yeniId = Date.now().toString();
+
     const yeniSayim = {
       id: yeniId,
-      ad: sayimAdiTarihli,
-      durum: "baslamamis", // ✅ varsayılan durum
+      not: sayimNotuTarihli, // 'ad' alanını 'not' olarak değiştirdik
+      durum: "baslamamis",
+      tarih: now.toISOString(), // Tarihi ISO formatında kaydet
+      urunSayisi: 0, // Başlangıç ürün sayısını 0 olarak ayarla
     };
 
     try {
       const veri = await AsyncStorage.getItem("sayimlar");
       const mevcut = veri ? JSON.parse(veri) : [];
 
-      const ayniAdVar = mevcut.find(
-        (s) => s.ad.toLowerCase() === sayimAdiTarihli.toLowerCase()
+      const ayniNotVar = mevcut.find(
+        (s) => s.not && s.not.toLowerCase() === sayimNotuTarihli.toLowerCase() // 'ad' yerine 'not' kontrolü ve null check
       );
-      if (ayniAdVar) {
-        Alert.alert("Uyarı", "Bu isimde bir sayım zaten var.");
+      if (ayniNotVar) {
+        Alert.alert(
+          "Uyarı",
+          `"${sayimNotuTarihli}" notuyla bir sayım zaten var.`
+        );
         return;
       }
 
       const guncel = [...mevcut, yeniSayim];
       await AsyncStorage.setItem("sayimlar", JSON.stringify(guncel));
+
+      // Önceki sayımlar listesini de güncelle
+      setOncekiSayimlar(
+        guncel.sort((a, b) => new Date(b.tarih) - new Date(a.tarih))
+      );
+      setSayimNotu(""); // Input'u temizle
+
       navigation.replace("SayimDetay", {
         sayimId: yeniId,
-        sayimAd: sayimAdiTarihli,
+        sayimNot: sayimNotuTarihli, // 'sayimAd' parametresini 'sayimNot' olarak değiştirdik
       });
     } catch (e) {
+      console.error("Sayım ekleme hatası:", e);
       Alert.alert("Hata", "Sayım eklenemedi.");
     }
   };
 
   return (
-    <View style={common.container}>
-      <Text style={common.title}>Yeni Sayım Oluştur</Text>
-      <Text style={common.subtitle}>
-        Aynı isimde sayım oluşturmamaya dikkat edin.
+    <View style={yeniSayimStyles.container}>
+      <Text style={yeniSayimStyles.title}>Yeni Sayım Oluştur</Text>
+      <Text style={commonStyles.subtitle}>
+        Aynı not ile sayım oluşturmamaya dikkat edin. Tarih otomatik
+        eklenecektir.
       </Text>
 
-      <Text style={[common.subtitle, { marginTop: 20 }]}>
+      <TextInput
+        style={yeniSayimStyles.input}
+        placeholder="Yeni sayım notu girin (örn: Depo A Rafları)"
+        value={sayimNotu}
+        onChangeText={setSayimNotu}
+      />
+      <TouchableOpacity style={yeniSayimStyles.button} onPress={sayimEkle}>
+        <MaterialCommunityIcons
+          name="plus-circle-outline"
+          size={20}
+          color="#fff"
+        />
+        <Text style={yeniSayimStyles.buttonText}>Sayımı Oluştur ve Başla</Text>
+      </TouchableOpacity>
+
+      <Text
+        style={[
+          commonStyles.subtitle,
+          {
+            marginTop: 30,
+            marginBottom: 10,
+            textAlign: "left",
+            fontWeight: "bold",
+          },
+        ]}
+      >
         📄 Önceki Sayımlar:
       </Text>
       <FlatList
         data={oncekiSayimlar}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <Text style={{ fontSize: 16, paddingVertical: 4 }}>• {item.ad}</Text>
+          <View
+            style={{
+              paddingVertical: 6,
+              borderBottomWidth: 1,
+              borderBottomColor: "#eee",
+            }}
+          >
+            <Text style={{ fontSize: 16 }}>• {item.not}</Text>
+            {/* 'item.ad' yerine 'item.not' */}
+            <Text style={{ fontSize: 12, color: "#777", marginLeft: 10 }}>
+              {new Date(item.tarih).toLocaleDateString("tr-TR")}
+            </Text>
+          </View>
         )}
         ListEmptyComponent={
-          <Text style={{ color: "#888", fontStyle: "italic" }}>
-            Henüz sayım yok.
+          <Text
+            style={{
+              color: "#888",
+              fontStyle: "italic",
+              textAlign: "center",
+              marginTop: 10,
+            }}
+          >
+            Henüz sayım kaydı yok.
           </Text>
         }
+        style={{ maxHeight: 200 }} // Liste için maksimum yükseklik
       />
-
-      <TextInput
-        style={common.input}
-        placeholder="Yeni sayım adı girin"
-        value={sayimAdi}
-        onChangeText={setSayimAdi}
-      />
-      <Button title="Ekle" onPress={sayimEkle} />
     </View>
   );
 }

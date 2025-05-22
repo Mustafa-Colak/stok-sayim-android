@@ -1,52 +1,50 @@
+// e:\edev\stok-sayim\screens\SayimDetay.js
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import {
   View,
   Text,
   FlatList,
   TextInput,
-  TouchableOpacity,
   Alert,
   KeyboardAvoidingView,
   Platform,
-  Switch,
+  ToastAndroid,
   InteractionManager,
 } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
 import common from "../styles/CommonStyles";
 import styles from "../styles/SayimDetayStyles";
 
-// Performans için memoize edilmiş bileşen
-const UrunSatiri = React.memo(({ item, onSil }) => (
-  <View style={styles.row}>
-    <Text style={styles.text}>
-      {item.barkod} - {item.miktar}
-    </Text>
-    <TouchableOpacity onPress={() => onSil(item.id)}>
-      <MaterialCommunityIcons
-        name="trash-can-outline"
-        size={22}
-        color="red"
-      />
-    </TouchableOpacity>
-  </View>
-));
+// Yardımcı fonksiyonlar ve bileşenler
+import {
+  urunleriYukle,
+  durumuYukle,
+  modTercihiniYukle,
+  modTercihiniKaydet,
+  sayimDurumuGuncelle,
+  urunleriKaydet
+} from "../utils/SayimDetayUtils";
+import {
+  UrunSatiri,
+  ModSecici,
+  SayimDurumuButonlari,
+  UrunEkleButonu,
+  UrunSayisiBilgisi
+} from "../components/SayimDetayComponents";
 
 export default function SayimDetay({ route, navigation }) {
-  const { sayimId, sayimAd } = route.params;
+  const { sayimId, sayimNot } = route.params;
   const [urunler, setUrunler] = useState([]);
-  const [gosterilecekUrunler, setGosterilecekUrunler] = useState([]); // Sadece gösterim için
+  const [gosterilecekUrunler, setGosterilecekUrunler] = useState([]);
   const [barkod, setBarkod] = useState("");
   const [miktar, setMiktar] = useState("");
+  const [not, setNot] = useState("");
   const [sayimDurum, setSayimDurum] = useState("");
   const [hizliMod, setHizliMod] = useState(false);
   const [yukleniyor, setYukleniyor] = useState(true);
-  
-  // Barkod input referansı
+
+  // Referanslar
   const barkodInputRef = useRef(null);
   const flatListRef = useRef(null);
-  
-  // Asenkron işlemleri yönetmek için ref'ler
   const kayitBekliyor = useRef(false);
   const sonKayitZamani = useRef(0);
   const urunlerRef = useRef([]);
@@ -55,26 +53,24 @@ export default function SayimDetay({ route, navigation }) {
   useEffect(() => {
     // Önce arayüzü göster, sonra verileri yükle
     InteractionManager.runAfterInteractions(() => {
-      urunleriYukle();
-      durumuYukle();
-      modTercihiniYukle();
+      veriYukle();
     });
-    
+
     // Kaydetme zamanlayıcısı
     const kaydetmeZamanlayici = setInterval(() => {
       if (kayitBekliyor.current && Date.now() - sonKayitZamani.current > 1000) {
         kayitBekliyor.current = false;
-        AsyncStorage.setItem(`sayim_${sayimId}`, JSON.stringify(urunlerRef.current))
+        urunleriKaydet(sayimId, urunlerRef.current)
           .catch(err => console.error("Otomatik kaydetme hatası:", err));
       }
     }, 2000);
-    
+
     // Temizleme işlemi
     return () => {
       clearInterval(kaydetmeZamanlayici);
       // Eğer bekleyen değişiklikler varsa kaydet
       if (kayitBekliyor.current) {
-        AsyncStorage.setItem(`sayim_${sayimId}`, JSON.stringify(urunlerRef.current))
+        urunleriKaydet(sayimId, urunlerRef.current)
           .catch(err => console.error("Çıkış kaydetme hatası:", err));
       }
     };
@@ -92,65 +88,73 @@ export default function SayimDetay({ route, navigation }) {
     }
   }, [yukleniyor]);
 
-  const modTercihiniYukle = async () => {
+  // Tüm verileri yükleme
+  const veriYukle = async () => {
     try {
-      const modTercihi = await AsyncStorage.getItem("hizli_mod_tercihi");
-      if (modTercihi !== null) {
-        setHizliMod(JSON.parse(modTercihi));
-      }
-    } catch (error) {
-      console.error("Mod tercihi yükleme hatası:", error);
-    }
-  };
+      // Ürünleri yükle
+      const urunVerisi = await urunleriYukle(sayimId);
+      urunlerRef.current = urunVerisi.tumUrunler;
+      setUrunler(urunVerisi.tumUrunler);
+      setGosterilecekUrunler(urunVerisi.gosterilecekUrunler);
 
-  const modTercihiniKaydet = (deger) => {
-    setHizliMod(deger);
-    AsyncStorage.setItem("hizli_mod_tercihi", JSON.stringify(deger))
-      .catch(err => console.error("Mod tercihi kaydetme hatası:", err));
-  };
+      // Durumu yükle
+      const durum = await durumuYukle(sayimId);
+      setSayimDurum(durum);
 
-  const urunleriYukle = async () => {
-    try {
-      const veri = await AsyncStorage.getItem(`sayim_${sayimId}`);
-      if (veri) {
-        const yuklenenUrunler = JSON.parse(veri);
-        urunlerRef.current = yuklenenUrunler;
-        setUrunler(yuklenenUrunler);
-        setGosterilecekUrunler([...yuklenenUrunler].reverse().slice(0, 50)); // İlk 50 ürünü göster
-      } else {
-        urunlerRef.current = [];
-        setUrunler([]);
-        setGosterilecekUrunler([]);
-      }
+      // Mod tercihini yükle
+      const modTercihi = await modTercihiniYukle();
+      setHizliMod(modTercihi);
     } catch (error) {
-      console.error("Ürün yükleme hatası:", error);
+      console.error("Veri yükleme hatası:", error);
+      Alert.alert("Hata", "Veriler yüklenirken bir hata oluştu.");
     } finally {
       setYukleniyor(false);
     }
   };
 
-  const durumuYukle = async () => {
-    try {
-      const listeStr = await AsyncStorage.getItem("sayimlar");
-      if (listeStr) {
-        const liste = JSON.parse(listeStr);
-        const sayim = liste.find((s) => s.id === sayimId);
-        if (sayim) {
-          setSayimDurum(sayim.durum);
-        }
+  // Mod tercihini değiştirme
+  const modTercihiniDegistir = (deger) => {
+    setHizliMod(deger);
+    
+    // Mod değişikliğinde miktar alanına varsayılan değer atama
+    if (!deger) { // Hızlı moddan normal moda geçildiğinde
+      setMiktar("1");
+      
+      // Kullanıcıya bildirim göster
+      if (Platform.OS === 'android') {
+        ToastAndroid.show('Normal moda geçildi. Miktar manuel girilebilir.', ToastAndroid.SHORT);
+      } else {
+        Alert.alert('Mod Değişikliği', 'Normal moda geçildi. Miktar manuel girilebilir.');
       }
-    } catch (error) {
-      console.error("Durum yükleme hatası:", error);
+    } else {
+      // Hızlı moda geçildiğinde bildirim göster
+      if (Platform.OS === 'android') {
+        ToastAndroid.show('Hızlı moda geçildi. Miktar otomatik 1 olarak ayarlanacak.', ToastAndroid.SHORT);
+      } else {
+        Alert.alert('Mod Değişikliği', 'Hızlı moda geçildi. Miktar otomatik 1 olarak ayarlanacak.');
+      }
     }
+    
+    // Mod değişikliğinde barkod alanına odaklan
+    setTimeout(() => {
+      if (barkodInputRef.current) {
+        barkodInputRef.current.focus();
+      }
+    }, 100);
+    
+    modTercihiniKaydet(deger).catch(
+      (err) => console.error("Mod tercihi kaydetme hatası:", err)
+    );
   };
 
+  // Ürün ekleme
   const urunEkle = () => {
     // Barkod kontrolü
     if (!barkod.trim()) {
       Alert.alert("Uyarı", "Barkod girin");
       return;
     }
-    
+
     // Manuel modda miktar kontrolü
     if (!hizliMod && !miktar) {
       Alert.alert("Uyarı", "Miktar girin");
@@ -162,111 +166,113 @@ export default function SayimDetay({ route, navigation }) {
       id: Date.now().toString(),
       barkod: barkod.trim(),
       miktar: hizliMod ? 1 : parseInt(miktar) || 1,
+      not: not.trim(),
+      ad: "",
     };
 
     // Önce ref'i güncelle
     const yeniListe = [...urunlerRef.current, yeni];
     urunlerRef.current = yeniListe;
-    
+
     // Sonra state'i güncelle (sadece son 50 ürünü göster)
     setUrunler(yeniListe);
     setGosterilecekUrunler([...yeniListe].reverse().slice(0, 50));
-    
+
     // Kayıt için işaretle
     kayitBekliyor.current = true;
     sonKayitZamani.current = Date.now();
-    
+
     // Sayım durumunu güncelle (sadece başlamamış ise)
     if (sayimDurum === "baslamamis") {
-      sayimDurumuGuncelle("devam");
+      durumuGuncelle("devam");
     }
 
     // Alanları temizle
     setBarkod("");
-    if (!hizliMod) setMiktar("");
-    
+    if (!hizliMod) setMiktar("1"); // Normal modda miktar alanını "1" olarak ayarla
+    setNot(""); // Not alanını temizle
+
     // Barkod alanına odaklan
     if (barkodInputRef.current) {
       barkodInputRef.current.focus();
     }
   };
 
-  const urunSil = useCallback((id) => {
-    // Önce ref'i güncelle
-    const yeniListe = urunlerRef.current.filter(u => u.id !== id);
-    urunlerRef.current = yeniListe;
-    
-    // Sonra state'i güncelle
-    setUrunler(yeniListe);
-    setGosterilecekUrunler([...yeniListe].reverse().slice(0, 50));
-    
-    // Kayıt için işaretle
-    kayitBekliyor.current = true;
-    sonKayitZamani.current = Date.now();
-    
-    // Eğer liste boş kaldıysa durumu güncelle
-    if (yeniListe.length === 0 && sayimDurum !== "kapandi") {
-      sayimDurumuGuncelle("baslamamis");
-    }
-  }, [sayimDurum]);
+  // Ürün silme
+  const urunSil = useCallback(
+    (id) => {
+      // Önce ref'i güncelle
+      const yeniListe = urunlerRef.current.filter((u) => u.id !== id);
+      urunlerRef.current = yeniListe;
 
-  const sayimDurumuGuncelle = async (yeniDurum) => {
+      // Sonra state'i güncelle
+      setUrunler(yeniListe);
+      setGosterilecekUrunler([...yeniListe].reverse().slice(0, 50));
+
+      // Kayıt için işaretle
+      kayitBekliyor.current = true;
+      sonKayitZamani.current = Date.now();
+
+      // Eğer liste boş kaldıysa durumu güncelle
+      if (yeniListe.length === 0 && sayimDurum !== "kapandi") {
+        durumuGuncelle("baslamamis");
+      }
+    },
+    [sayimDurum]
+  );
+
+  // Durum güncelleme
+  const durumuGuncelle = async (yeniDurum) => {
     setSayimDurum(yeniDurum);
-    
-    try {
-      const listeStr = await AsyncStorage.getItem("sayimlar");
-      if (!listeStr) return;
 
-      const liste = JSON.parse(listeStr);
-      const guncel = liste.map((s) =>
-        s.id === sayimId ? { ...s, durum: yeniDurum } : s
-      );
-
-      await AsyncStorage.setItem("sayimlar", JSON.stringify(guncel));
-
+    const basarili = await sayimDurumuGuncelle(sayimId, yeniDurum);
+    if (basarili) {
       // Durumu SayimListesi ekranına yansıtmak için
       const sayimListesiEkrani = navigation.getParent();
       if (sayimListesiEkrani) {
         sayimListesiEkrani.setParams({ durumuGuncelle: true });
       }
-    } catch (error) {
-      console.error("Durum güncelleme hatası:", error);
     }
   };
 
+  // Sayımı sonlandırma
   const sayimiSonlandir = async () => {
     // Önce bekleyen değişiklikleri kaydet
     if (kayitBekliyor.current) {
-      try {
-        await AsyncStorage.setItem(`sayim_${sayimId}`, JSON.stringify(urunlerRef.current));
+      const basarili = await urunleriKaydet(sayimId, urunlerRef.current);
+      if (basarili) {
         kayitBekliyor.current = false;
-      } catch (error) {
-        console.error("Kaydetme hatası:", error);
+      } else {
+        Alert.alert("Hata", "Sayım kapatılırken bir sorun oluştu.");
+        return;
       }
     }
-    
-    await sayimDurumuGuncelle("kapandi");
+
+    await durumuGuncelle("kapandi");
     Alert.alert("Sayım Kapatıldı", "Bu sayım kapanmış olarak işaretlendi.");
     navigation.goBack();
   };
 
+  // Sayıma devam etme
   const sayimaDevamEt = async () => {
     // Önce bekleyen değişiklikleri kaydet
     if (kayitBekliyor.current) {
-      try {
-        await AsyncStorage.setItem(`sayim_${sayimId}`, JSON.stringify(urunlerRef.current));
+      const basarili = await urunleriKaydet(sayimId, urunlerRef.current);
+      if (basarili) {
         kayitBekliyor.current = false;
-      } catch (error) {
-        console.error("Kaydetme hatası:", error);
+      } else {
+        Alert.alert("Hata", "Sayım açılırken bir sorun oluştu.");
+        return;
       }
     }
-    
+
     const yeniDurum = urunlerRef.current.length === 0 ? "baslamamis" : "devam";
-    await sayimDurumuGuncelle(yeniDurum);
+    await durumuGuncelle(yeniDurum);
     Alert.alert("Devam Ediliyor", "Bu sayım tekrar düzenlenebilir hale geldi.");
     navigation.goBack();
   };
 
+  // Barkod girişini tamamlama
   const barkodGirisiniTamamla = () => {
     if (hizliMod) {
       urunEkle();
@@ -276,7 +282,12 @@ export default function SayimDetay({ route, navigation }) {
   // Yükleniyor durumu
   if (yukleniyor) {
     return (
-      <View style={[common.container, { justifyContent: 'center', alignItems: 'center' }]}>
+      <View
+        style={[
+          common.container,
+          { justifyContent: "center", alignItems: "center" },
+        ]}
+      >
         <Text>Yükleniyor...</Text>
       </View>
     );
@@ -287,24 +298,15 @@ export default function SayimDetay({ route, navigation }) {
       style={common.container}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <Text style={common.title}>{sayimAd}</Text>
-
-      <View style={styles.modeContainer}>
-        <Text style={styles.modeText}>Hızlı Sayım Modu:</Text>
-        <Switch
-          value={hizliMod}
-          onValueChange={modTercihiniKaydet}
-          trackColor={{ false: "#767577", true: "#81b0ff" }}
-          thumbColor={hizliMod ? "#007bff" : "#f4f3f4"}
-        />
-      </View>
-
-      <Text style={styles.modeDescription}>
-        {hizliMod
-          ? "Hızlı mod: Sadece barkod girin, miktar otomatik 1 olarak eklenir."
-          : "Manuel mod: Barkod ve miktar girmeniz gerekir."}
-      </Text>
-
+      <Text style={common.title}>{sayimNot}</Text>
+      
+      {/* Mod seçici */}
+      <ModSecici 
+        hizliMod={hizliMod} 
+        onModDegistir={modTercihiniDegistir} 
+      />
+      
+      {/* Giriş alanları */}
       <View style={styles.inputContainer}>
         <TextInput
           ref={barkodInputRef}
@@ -324,37 +326,36 @@ export default function SayimDetay({ route, navigation }) {
             placeholder="Miktar"
             keyboardType="numeric"
             style={styles.input}
-            onSubmitEditing={urunEkle}
-            returnKeyType="done"
+            returnKeyType="next"
             blurOnSubmit={false}
           />
         )}
+        <TextInput
+          value={not}
+          onChangeText={setNot}
+          placeholder="Not (opsiyonel)"
+          style={styles.input}
+          onSubmitEditing={urunEkle}
+          returnKeyType="done"
+          blurOnSubmit={false}
+        />
       </View>
-
-      <TouchableOpacity 
-        style={styles.addBtn} 
-        onPress={urunEkle}
-        activeOpacity={0.7}
-      >
-        <MaterialCommunityIcons name="plus" size={22} color="#fff" />
-        <Text style={styles.addText}>
-          {hizliMod ? "Hızlı Ekle (Miktar: 1)" : "Ürün Ekle"}
-        </Text>
-      </TouchableOpacity>
-
-      {urunler.length > 0 && (
-        <Text style={styles.countText}>
-          Toplam: {urunler.length} ürün {gosterilecekUrunler.length < urunler.length ? `(Son ${gosterilecekUrunler.length} gösteriliyor)` : ''}
-        </Text>
-      )}
-
+      
+      {/* Ürün ekleme butonu */}
+      <UrunEkleButonu onPress={urunEkle} hizliMod={hizliMod} />
+      
+      {/* Ürün sayısı bilgisi */}
+      <UrunSayisiBilgisi 
+        toplamUrun={urunler.length} 
+        gosterilecekUrunSayisi={gosterilecekUrunler.length} 
+      />
+      
+      {/* Ürün listesi */}
       <FlatList
         ref={flatListRef}
         data={gosterilecekUrunler}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <UrunSatiri item={item} onSil={urunSil} />
-        )}
+        renderItem={({ item }) => <UrunSatiri item={item} onSil={urunSil} />}
         ListEmptyComponent={
           <Text style={common.subtitle}>Bu sayımda henüz ürün yok.</Text>
         }
@@ -364,32 +365,19 @@ export default function SayimDetay({ route, navigation }) {
         maxToRenderPerBatch={5}
         windowSize={5}
         removeClippedSubviews={true}
-        getItemLayout={(data, index) => (
-          {length: 45, offset: 45 * index, index}
-        )}
+        getItemLayout={(data, index) => ({
+          length: 45,
+          offset: 45 * index,
+          index,
+        })}
       />
-
-      {sayimDurum !== "kapandi" && (
-        <TouchableOpacity
-          style={[styles.addBtn, { backgroundColor: "gray", marginTop: 10 }]}
-          onPress={sayimiSonlandir}
-          activeOpacity={0.7}
-        >
-          <MaterialCommunityIcons name="lock-check" size={22} color="#fff" />
-          <Text style={styles.addText}>Sayımı Sonlandır</Text>
-        </TouchableOpacity>
-      )}
-
-      {sayimDurum === "kapandi" && (
-        <TouchableOpacity
-          style={[styles.addBtn, { backgroundColor: "#28a745", marginTop: 10 }]}
-          onPress={sayimaDevamEt}
-          activeOpacity={0.7}
-        >
-          <MaterialCommunityIcons name="refresh" size={22} color="#fff" />
-          <Text style={styles.addText}>Devam Et</Text>
-        </TouchableOpacity>
-      )}
+      
+      {/* Sayım durumu butonları */}
+      <SayimDurumuButonlari 
+        sayimDurum={sayimDurum} 
+        onSonlandir={sayimiSonlandir} 
+        onDevamEt={sayimaDevamEt} 
+      />
     </KeyboardAvoidingView>
   );
 }

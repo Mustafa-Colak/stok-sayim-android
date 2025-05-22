@@ -1,255 +1,340 @@
-import React, { useEffect, useState } from "react";
+// e:\edev\stok-sayim\screens\SayimListesi.js
+import React, { useState, useCallback, useLayoutEffect } from "react";
 import {
   View,
   Text,
   FlatList,
   TouchableOpacity,
   Alert,
+  RefreshControl,
   StyleSheet,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { Swipeable } from "react-native-gesture-handler";
-import common from "../styles/CommonStyles";
+import {
+  useNavigation,
+  useFocusEffect,
+  useRoute,
+} from "@react-navigation/native";
+import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
+import Swipeable from "react-native-gesture-handler/Swipeable";
+import styles from "../styles/SayimListesiStyles"; // Stil dosyasını import ediyoruz
 
-const durumMetni = {
-  baslamamis: "Başlamamış",
-  devam: "Devam Ediyor",
-  kapandi: "Kapanmış",
-};
-
-export default function SayimListesi({ navigation, route }) {
+export default function SayimListesi() {
+  const navigation = useNavigation();
+  const route = useRoute(); // route parametrelerine erişim için
   const [sayimlar, setSayimlar] = useState([]);
-  const [silinenSayimlar, setSilinenSayimlar] = useState([]);
+  const [refreshing, setRefreshing] = useState(false);
+  const [silinenSayimId, setSilinenSayimId] = useState(null);
+  const [kapatilanSayimId, setKapatilanSayimId] = useState(null);
+  let rowRefs = new Map();
 
-  // Sayımları ve durumlarını yükle
-  const sayimlariYukle = async () => {
+  const isSelectForReportMode = route.params?.purpose === "selectForReport";
+
+  const fetchSayimlar = useCallback(async () => {
+    setRefreshing(true);
     try {
-      const veri = await AsyncStorage.getItem("sayimlar");
-      if (!veri) {
-        return;
-      }
+      const sayimlarListesiStr = await AsyncStorage.getItem("sayimlar");
+      if (sayimlarListesiStr) {
+        const sayimlarMetadaListesi = JSON.parse(sayimlarListesiStr);
 
-      let sayimlar = JSON.parse(veri);
-
-      // Her sayımın durumunu kontrol et ve güncelle
-      const guncelSayimlar = await Promise.all(
-        sayimlar.map(async (sayim) => {
-          // Sayımın ürünlerini kontrol et
-          const urunVeri = await AsyncStorage.getItem(`sayim_${sayim.id}`);
-          const urunler = urunVeri ? JSON.parse(urunVeri) : [];
-
-          // Sayım durumunu güncelle
-          let guncelDurum = sayim.durum;
-          if (sayim.durum !== "kapandi") {
-            guncelDurum = urunler.length === 0 ? "baslamamis" : "devam";
-          }
-          
-          return {
-            ...sayim,
-            durum: guncelDurum
-          };
-        })
-      );
-      
-      // Güncel sayımları AsyncStorage'a kaydet
-      await AsyncStorage.setItem("sayimlar", JSON.stringify(guncelSayimlar));
-      
-      // State'i güncelle
-      setSayimlar(guncelSayimlar);
-    } catch (e) {
-      Alert.alert("Hata", "Sayım listesi yüklenemedi.");
-    }
-  };
-
-  useEffect(() => {
-    const unsubscribe = navigation.addListener("focus", () => {
-      sayimlariYukle();
-    });
-    return unsubscribe;
-  }, [navigation]);
-
-  // Sayım durumu değiştiğinde otomatik yenile
-  useEffect(() => {
-    if (route.params?.durumuGuncelle) {
-      sayimlariYukle();
-      // Parametreyi temizle
-      navigation.setParams({ durumuGuncelle: undefined });
-    }
-  }, [route.params?.durumuGuncelle]);
-
-  const yeniSayimEkle = () => {
-    navigation.navigate("YeniSayim", {
-      onEkle: async (yeni) => {
-        const guncel = [...sayimlar, yeni];
-        await AsyncStorage.setItem("sayimlar", JSON.stringify(guncel));
-        setSayimlar(guncel);
-            },
-    });
-  };
-
-  const sayimSil = async (id) => {
-    const silinen = sayimlar.find((s) => s.id === id);
-    const kalan = sayimlar.filter((s) => s.id !== id);
-
-    setSayimlar(kalan);
-    setSilinenSayimlar((prev) => [...prev, silinen]);
-
-    await AsyncStorage.setItem("sayimlar", JSON.stringify(kalan));
-    await AsyncStorage.removeItem(`sayim_${id}`);
-  };
-
-  const sayimGeriAl = async (id) => {
-    const geriAlinan = silinenSayimlar.find((s) => s.id === id);
-    const yeniSayimlar = [...sayimlar, geriAlinan];
-    const yeniSilinen = silinenSayimlar.filter((s) => s.id !== id);
-
-    setSayimlar(yeniSayimlar);
-    setSilinenSayimlar(yeniSilinen);
-    await AsyncStorage.setItem("sayimlar", JSON.stringify(yeniSayimlar));
-  };
-
-  const silmeButonu = (id) => (
-    <TouchableOpacity
-      style={styles.deleteButton}
-        onPress={() =>
-        Alert.alert(
-          "Sayımı Sil",
-          "Bu sayımı silmek istediğinize emin misiniz?",
-          [
-            { text: "İptal", style: "cancel" },
-            {
-              text: "Sil",
-              style: "destructive",
-              onPress: () => sayimSil(id),
-  },
-          ]
-        )
-      }
-    >
-      <MaterialCommunityIcons name="trash-can-outline" size={24} color="#fff" />
-    </TouchableOpacity>
-  );
-
-  const renderItem = ({ item }) => (
-    <Swipeable renderRightActions={() => silmeButonu(item.id)}>
-      <TouchableOpacity
-        style={styles.itemRow}
-        onPress={() =>
-          navigation.navigate("SayimDetay", {
-            sayimId: item.id,
-            sayimAd: item.ad,
+        const enrichedSayimlar = await Promise.all(
+          sayimlarMetadaListesi.map(async (meta) => {
+            let urunSayisi = 0;
+            if (meta.id) {
+              try {
+                const urunlerStr = await AsyncStorage.getItem(
+                  `sayim_${meta.id}`
+                );
+                if (urunlerStr) {
+                  const urunler = JSON.parse(urunlerStr);
+                  urunSayisi = urunler.length;
+                }
+              } catch (e) {
+                console.error(
+                  `SayimListesi: sayim ${meta.id} için ürün sayısı alınırken hata:`,
+                  e
+                );
+                urunSayisi = meta.urunSayisi || 0;
+              }
+            } else {
+              urunSayisi = meta.urunSayisi || 0;
+            }
+            return {
+              id: meta.id,
+              not: meta.not, 
+              tarih: meta.tarih, 
+              durum: meta.durum || "Başlamadı",
+              urunSayisi: urunSayisi,
+            };
           })
-        }
-      >
-        <Text style={styles.itemText}>{item.ad}</Text>
-        <Text style={[
-          styles.durumText, 
-          item.durum === "baslamamis" ? styles.durumBaslamamis : 
-          item.durum === "devam" ? styles.durumDevam : 
-          styles.durumKapandi
-        ]}>
-          {durumMetni[item.durum] || "Durum Yok"}
-          </Text>
-      </TouchableOpacity>
-    </Swipeable>
+        );
+
+        setSayimlar(
+          enrichedSayimlar.sort((a, b) => {
+            const dateA = a.tarih ? new Date(a.tarih) : null;
+            const dateB = b.tarih ? new Date(b.tarih) : null;
+
+            // Geçersiz tarihleri sona at
+            if (dateA && isNaN(dateA.getTime())) return 1;
+            if (dateB && isNaN(dateB.getTime())) return -1;
+            if (!dateA && dateB) return 1;
+            if (dateA && !dateB) return -1;
+            if (!dateA && !dateB) return 0; // İkisi de null ise sıralama değişmesin
+
+            return dateB - dateA; // En yeni tarih en üste
+          })
+        );
+      } else {
+        setSayimlar([]);
+      }
+    } catch (error) {
+      console.error("Sayimlar yüklenirken hata:", error);
+      Alert.alert("Hata", "Sayımlar yüklenemedi.");
+    }
+    setRefreshing(false);
+  }, []);
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      title: isSelectForReportMode
+        ? "Rapor için Sayım Seçin"
+        : "Stok Sayım / Sayımlar",
+      headerRight: () =>
+        !isSelectForReportMode && (
+          <MaterialCommunityIcons
+            name="plus-circle-outline"
+            size={28}
+            color="#fff"
+            style={{ marginRight: 16 }}
+            onPress={() => navigation.navigate("YeniSayim")}
+          />
+        ),
+      headerTintColor: "#fff",
+      headerStyle: { backgroundColor: "#007bff" },
+    });
+  }, [navigation, isSelectForReportMode]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchSayimlar();
+      if (silinenSayimId) setSilinenSayimId(null);
+      if (kapatilanSayimId) setKapatilanSayimId(null);
+      return () => {
+        rowRefs.forEach((ref) => ref?.close());
+        rowRefs.clear();
+      };
+    }, [fetchSayimlar, silinenSayimId, kapatilanSayimId])
   );
 
-  const renderSilinen = ({ item }) => (
-    <View style={styles.deletedRow}>
-      <Text style={styles.itemText}>{item.ad}</Text>
-      <TouchableOpacity onPress={() => sayimGeriAl(item.id)}>
-        <Text style={styles.undoText}>Geri Al</Text>
-      </TouchableOpacity>
-    </View>
-  );
+  const handleKapat = async (sayimId, sayimNotu) => {
+    Alert.alert(
+      "Sayımı Kapat",
+      `"${sayimNotu}" notlu sayımı kapatmak istediğinizden emin misiniz? Kapatılan sayım düzenlenemez.`,
+      [
+        { text: "Vazgeç", style: "cancel" },
+        {
+          text: "Evet, Kapat",
+          onPress: async () => {
+            try {
+              const sayimlarStr = await AsyncStorage.getItem("sayimlar");
+              if (sayimlarStr) {
+                let sayimlarArray = JSON.parse(sayimlarStr);
+                sayimlarArray = sayimlarArray.map((s) =>
+                  s.id === sayimId ? { ...s, durum: "Kapandı" } : s
+                );
+                await AsyncStorage.setItem(
+                  "sayimlar",
+                  JSON.stringify(sayimlarArray)
+                );
+                setKapatilanSayimId(sayimId); // Animasyon için
+                fetchSayimlar(); // Listeyi yenile
+              }
+            } catch (error) {
+              console.error("Sayım kapatma hatası:", error);
+              Alert.alert("Hata", "Sayım kapatılamadı.");
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleSil = async (sayimId, sayimNotu) => {
+    Alert.alert(
+      "Sayımı Sil",
+      `"${sayimNotu}" notlu sayımı silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.`,
+      [
+        { text: "Vazgeç", style: "cancel" },
+        {
+          text: "Evet, Sil",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              // Ana sayımlar listesinden sil
+              const sayimlarStr = await AsyncStorage.getItem("sayimlar");
+              if (sayimlarStr) {
+                let sayimlarArray = JSON.parse(sayimlarStr);
+                sayimlarArray = sayimlarArray.filter((s) => s.id !== sayimId);
+                await AsyncStorage.setItem(
+                  "sayimlar",
+                  JSON.stringify(sayimlarArray)
+                );
+              }
+              // Sayıma ait ürünleri sil
+              await AsyncStorage.removeItem(`sayim_${sayimId}`);
+              setSilinenSayimId(sayimId); // Animasyon için
+              fetchSayimlar(); // Listeyi yenile
+            } catch (error) {
+              console.error("Sayım silme hatası:", error);
+              Alert.alert("Hata", "Sayım silinemedi.");
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleSayimPress = (item) => {
+    if (isSelectForReportMode) {
+      navigation.navigate("RaporOlustur", {
+        sayimNot: item.not,
+        sayimId: item.id, // RaporOlustur ekranı sayimId'yi de bekliyor
+      });
+    } else {
+      navigation.navigate("SayimDetay", {
+        sayimId: item.id,
+        sayimNot: item.not,
+        sayimDurumu: item.durum,
+      });
+    }
+  };
+
+  const renderRightActions = (progress, dragX, item) => {
+    if (item.durum === "Kapandı" || isSelectForReportMode) {
+      return null;
+    }
+    return (
+      <View style={{ flexDirection: "row" }}>
+        <TouchableOpacity
+          style={[styles.deleteButton, { backgroundColor: "#28a745" }]} // Yeşil renk kapatma için
+          onPress={() => {
+            rowRefs.get(item.id)?.close();
+            handleKapat(item.id, item.not);
+          }}
+        >
+          <MaterialCommunityIcons
+            name="check-circle-outline"
+            size={24}
+            color="#fff"
+          />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.deleteButton} // Kırmızı renk silme için (varsayılan)
+          onPress={() => {
+            rowRefs.get(item.id)?.close();
+            handleSil(item.id, item.not);
+          }}
+        >
+          <MaterialCommunityIcons
+            name="delete-outline"
+            size={24}
+            color="#fff"
+          />
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
+  const renderItem = ({ item }) => {
+    if (silinenSayimId === item.id || kapatilanSayimId === item.id) {
+      return (
+        <View style={styles.deletedRow}>
+          <Text style={styles.itemText}>
+            {kapatilanSayimId === item.id
+              ? `"${item.not}" kapatıldı.`
+              : `"${item.not}" silindi.`}
+          </Text>
+        </View>
+      );
+    }
+
+    const durumStyle =
+      item.durum === "baslamamis" // Durumları küçük harfle kontrol et
+        ? styles.durumBaslamamis
+        : item.durum === "devam" // Durumları küçük harfle kontrol et
+        ? styles.durumDevam
+        : styles.durumKapandi;
+
+    let tarihGosterimi = "Tarih bilgisi yok";
+    if (item.tarih) {
+      const tarihObj = new Date(item.tarih);
+      if (!isNaN(tarihObj.getTime())) {
+        tarihGosterimi = tarihObj.toLocaleDateString("tr-TR");
+      }
+    }
+
+    return (
+      <Swipeable
+        ref={(ref) => rowRefs.set(item.id, ref)}
+        renderRightActions={(progress, dragX) =>
+          renderRightActions(progress, dragX, item)
+        }
+        overshootRight={false}
+        enabled={item.durum !== "Kapandı" && !isSelectForReportMode}
+      >
+        <TouchableOpacity
+          style={styles.itemRow}
+          onPress={() => handleSayimPress(item)}
+        >
+          <View style={{ flex: 1 }}>
+            <Text style={styles.itemText}>{item.not}</Text>
+            <Text style={{ fontSize: 12, color: "#777" }}>
+              {tarihGosterimi} - {item.urunSayisi || 0} ürün
+            </Text>
+          </View>
+          <Text style={[styles.durumText, durumStyle]}>{item.durum}</Text>
+        </TouchableOpacity>
+      </Swipeable>
+    );
+  };
 
   return (
-    <View style={common.container}>
-      <Text style={common.title}>Sayım Listesi</Text>
-
-      <FlatList
-        data={sayimlar}
-        keyExtractor={(item) => item.id}
-        renderItem={renderItem}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
-        ListEmptyComponent={
-          <Text style={common.subtitle}>Henüz kayıtlı sayım yok.</Text>
-}
-      />
-
-      {silinenSayimlar.length > 0 && (
-        <>
-          <Text style={[common.title, { marginTop: 30 }]}>
-            Silinen Sayımlar
+    <View style={styles.container}>
+      {sayimlar.length === 0 && !refreshing ? (
+        <View
+          style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+        >
+          <Text style={{ fontSize: 18, color: "#888" }}>
+            Henüz sayım kaydı bulunmuyor.
           </Text>
-          <FlatList
-            data={silinenSayimlar}
-            keyExtractor={(item) => item.id}
-            renderItem={renderSilinen}
-            ItemSeparatorComponent={() => <View style={styles.separator} />}
-          />
-        </>
+          {!isSelectForReportMode && (
+            <TouchableOpacity
+              style={[
+                styles.button,
+                { marginTop: 20, backgroundColor: "#28a745", width: "80%" },
+              ]}
+              onPress={() => navigation.navigate("YeniSayim")}
+            >
+              <MaterialCommunityIcons name="plus" size={20} color="#fff" />
+              <Text style={styles.buttonText}> Yeni Sayım Oluştur</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      ) : (
+        <FlatList
+          data={sayimlar}
+          renderItem={renderItem}
+          keyExtractor={(item) => item.id}
+          ItemSeparatorComponent={() => <View style={styles.separator} />}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={fetchSayimlar}
+              colors={["#007bff"]}
+            />
+          }
+        />
       )}
-
-      <TouchableOpacity style={common.floatingButton} onPress={yeniSayimEkle}>
-        <MaterialCommunityIcons name="plus" size={24} color="#fff" />
-        <Text style={{ color: "#fff", fontWeight: "bold", marginLeft: 5 }}>
-          Yeni Sayım
-        </Text>
-      </TouchableOpacity>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  itemRow: {
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    backgroundColor: "#fff",
-    justifyContent: "center",
-  },
-  deletedRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    backgroundColor: "#eee",
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-  },
-  itemText: {
-    fontSize: 16,
-    color: "#333",
-  },
-  durumText: {
-    fontSize: 14,
-    position: "absolute",
-    right: 20,
-    top: 18,
-  },
-  durumBaslamamis: {
-    color: "#888",
-  },
-  durumDevam: {
-    color: "#007bff",
-    fontWeight: "500",
-  },
-  durumKapandi: {
-    color: "#28a745",
-    fontWeight: "500",
-  },
-  undoText: {
-    color: "#007bff",
-    fontWeight: "bold",
-  },
-  separator: {
-    height: 1,
-    backgroundColor: "#ccc",
-    marginHorizontal: 20,
-  },
-  deleteButton: {
-    backgroundColor: "red",
-    justifyContent: "center",
-    alignItems: "center",
-    width: 64,
-  },
-});

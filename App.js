@@ -1,3 +1,4 @@
+// e:\edev\stok-sayim\App.js
 import React from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
@@ -7,12 +8,8 @@ import GirisEkrani from "./screens/GirisEkrani";
 import AnaMenu from "./screens/AnaMenu";
 import SayimListesi from "./screens/SayimListesi";
 import SayimDetay from "./screens/SayimDetay";
-import UrunEkle from "./screens/UrunEkle";
-import UrunDetay from "./screens/UrunDetay";
 import RaporOlustur from "./screens/RaporOlustur";
-import SayimSil from "./screens/SayimSil";
 import YeniSayim from "./screens/YeniSayim";
-import UrunGuncelle from "./screens/UrunGuncelle";
 
 const Stack = createStackNavigator();
 
@@ -33,63 +30,11 @@ export default function App() {
           name="SayimListesi"
           component={SayimListesi}
           options={{
-            title: "Sayım Listesi",
+            title: "Sayım Listesi", // Bu başlık SayimListesi içinde dinamik olarak ayarlanıyor
             headerBackTitleVisible: false,
             headerTitleAlign: "center",
-            headerTintColor: "#fff",
-            headerBackImage: () => (
-              <MaterialCommunityIcons
-                name="arrow-left"
-                size={32} // ✅ BÜYÜK OK
-                color="#fff"
-                style={{ marginLeft: 10 }}
-              />
-            ),
-          }}
-        />
-
-        <Stack.Screen
-          name="SayimDetay"
-          component={SayimDetay}
-          options={({ route }) => ({
-            title: `Stok Sayım / ${route.params?.sayimAd || ""}`,
-            headerTintColor: "#fff",
-            headerStyle: { backgroundColor: "#007bff" },
-            headerTitleStyle: { fontWeight: "bold" },
-            headerBackImage: () => (
-              <MaterialCommunityIcons
-                name="arrow-left"
-                size={32} // ✅ BÜYÜK OK
-                color="#fff"
-                style={{ marginLeft: 10 }}
-              />
-            ),
-            headerRight: () => (
-              <MaterialCommunityIcons
-                name="file-document-outline"
-                size={24}
-                color="#fff"
-                style={{ marginRight: 16 }}
-                onPress={() => {
-                  // buraya istersen raporla fonksiyonu eklersin
-                }}
-              />
-            ),
-          })}
-        />
-
-        <Stack.Screen name="UrunEkle" component={UrunEkle} />
-        <Stack.Screen name="UrunGuncelle" component={UrunGuncelle} />
-        <Stack.Screen name="UrunDetay" component={UrunDetay} />
-
-        <Stack.Screen
-          name="RaporOlustur"
-          component={RaporOlustur}
-          options={{
-            title: "Rapor Oluştur",
-            headerTintColor: "#fff",
-            headerStyle: { backgroundColor: "#007bff" },
-            headerTitleStyle: { fontWeight: "bold" },
+            // headerTintColor: "#fff", // screenOptions'tan miras alınıyor
+            // headerStyle: { backgroundColor: "#007bff" }, // screenOptions'tan miras alınıyor
             headerBackImage: () => (
               <MaterialCommunityIcons
                 name="arrow-left"
@@ -101,16 +46,76 @@ export default function App() {
           }}
         />
 
-        <Stack.Screen name="SayimSil" component={SayimSil} />
-        
+        <Stack.Screen
+          name="SayimDetay"
+          component={SayimDetay}
+          options={({ route, navigation }) => ({
+            // navigation eklendi
+            title: `Stok Sayım / ${route.params?.sayimNot || ""}`, // sayimAd -> sayimNot
+            // headerTintColor: "#fff", // screenOptions'tan miras alınıyor
+            // headerStyle: { backgroundColor: "#007bff" }, // screenOptions'tan miras alınıyor
+            // headerTitleStyle: { fontWeight: "bold" }, // screenOptions'tan miras alınıyor
+            headerBackImage: () => (
+              <MaterialCommunityIcons
+                name="arrow-left"
+                size={32}
+                color="#fff"
+                style={{ marginLeft: 10 }}
+              />
+            ),
+            headerRight: () => (
+              <MaterialCommunityIcons
+                name="file-document-outline"
+                size={24}
+                color="#fff"
+                style={{ marginRight: 16 }}
+                onPress={() => {
+                  if (route.params?.sayimId && route.params?.sayimNot) {
+                    navigation.navigate("RaporOlustur", {
+                      sayimId: route.params.sayimId,
+                      sayimNot: route.params.sayimNot,
+                    });
+                  } else {
+                    console.warn(
+                      "Rapor oluşturmak için sayimId veya sayimNot eksik."
+                    );
+                    // İsteğe bağlı olarak kullanıcıya bir Alert gösterebilirsiniz.
+                    // Alert.alert("Hata", "Rapor oluşturmak için gerekli bilgiler eksik.");
+                  }
+                }}
+              />
+            ),
+          })}
+        />
+
+        <Stack.Screen
+          name="RaporOlustur"
+          component={RaporOlustur}
+          options={{
+            // Bu başlık RaporOlustur içinde dinamik olarak ayarlanıyor
+            title: "Rapor Oluştur",
+            // headerTintColor: "#fff", // screenOptions'tan miras alınıyor
+            // headerStyle: { backgroundColor: "#007bff" }, // screenOptions'tan miras alınıyor
+            // headerTitleStyle: { fontWeight: "bold" }, // screenOptions'tan miras alınıyor
+            headerBackImage: () => (
+              <MaterialCommunityIcons
+                name="arrow-left"
+                size={32}
+                color="#fff"
+                style={{ marginLeft: 10 }}
+              />
+            ),
+          }}
+        />
+
         <Stack.Screen
           name="YeniSayim"
           component={YeniSayim}
           options={{
             title: "Yeni Sayım",
-            headerTintColor: "#fff",
-            headerStyle: { backgroundColor: "#007bff" },
-            headerTitleStyle: { fontWeight: "bold" },
+            // headerTintColor: "#fff", // screenOptions'tan miras alınıyor
+            // headerStyle: { backgroundColor: "#007bff" }, // screenOptions'tan miras alınıyor
+            // headerTitleStyle: { fontWeight: "bold" }, // screenOptions'tan miras alınıyor
             headerBackImage: () => (
               <MaterialCommunityIcons
                 name="arrow-left"
