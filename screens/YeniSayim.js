@@ -95,18 +95,18 @@ export default function YeniSayim({ navigation }) {
 
   return (
     <View style={yeniSayimStyles.container}>
-      <Text style={yeniSayimStyles.title}>Yeni Sayım Oluştur</Text>
-      <Text style={commonStyles.subtitle}>
-        Aynı not ile sayım oluşturmamaya dikkat edin. Tarih otomatik
-        eklenecektir.
-      </Text>
-
       <TextInput
         style={yeniSayimStyles.input}
         placeholder="Yeni sayım notu girin (örn: Depo A Rafları)"
         value={sayimNotu}
         onChangeText={setSayimNotu}
       />
+
+      <Text style={commonStyles.subtitle}>
+        Aynı not ile sayım oluşturmamaya dikkat edin. Tarih otomatik
+        eklenecektir.
+      </Text>
+
       <TouchableOpacity style={yeniSayimStyles.button} onPress={sayimEkle}>
         <MaterialCommunityIcons
           name="plus-circle-outline"

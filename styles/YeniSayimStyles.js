@@ -3,15 +3,16 @@ import { StyleSheet } from 'react-native';
 export default StyleSheet.create({
   container: {
     flex: 1,
-    padding: 30,
-    justifyContent: 'center',
+    padding: 20, // Padding'i azalttım (30'dan 20'ye)
+    paddingTop: 10, // Üst tarafta daha az boşluk olması için
+    // justifyContent: 'center', // Bu satırı kaldırdım
     backgroundColor: '#f9f9f9',
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
     textAlign: 'center',
-    marginBottom: 30,
+    marginBottom: 20, // Margin'i azalttım (30'dan 20'ye)
   },
   input: {
     borderWidth: 1,

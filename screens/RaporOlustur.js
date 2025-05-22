@@ -1,12 +1,6 @@
 // e:\edev\stok-sayim\screens\RaporOlustur.js
 import React, { useLayoutEffect, useEffect, useState } from "react";
-import {
-  View,
-  Text,
-  Alert,
-  TouchableOpacity,
-  ScrollView,
-} from "react-native";
+import { View, Text, Alert, TouchableOpacity, ScrollView } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as FileSystem from "expo-file-system";
 import * as Sharing from "expo-sharing";
@@ -32,15 +26,15 @@ export default function RaporOlustur({ navigation, route }) {
   const STORAGE_KEY = `sayim_${sayimId}`;
   const [urunler, setUrunler] = useState([]);
   // Dosya adını otomatik olarak sayım notundan oluştur
-  const dosyaAdi = sayimNot 
-    ? sayimNot.replace(/\s+/g, "_").toLowerCase() 
+  const dosyaAdi = sayimNot
+    ? sayimNot.replace(/\s+/g, "_").toLowerCase()
     : "rapor";
 
   useLayoutEffect(() => {
     navigation.setOptions({
-      title: `Stok Sayım / ${sayimNot || "Rapor"} / Rapor`,
+      title: "Dışa Aktar",
     });
-  }, [navigation, sayimNot]);
+  }, [navigation]);
 
   useEffect(() => {
     const yukle = async () => {
@@ -210,7 +204,7 @@ export default function RaporOlustur({ navigation, route }) {
 
       // Oluşturulan PDF'i kullanıcının istediği isimle yeni bir dosyaya kopyala
       const yeniDosyaYolu = `${FileSystem.documentDirectory}${dosyaAdi}.pdf`;
-      
+
       // Önce eski dosya varsa sil
       try {
         const dosyaBilgisi = await FileSystem.getInfoAsync(yeniDosyaYolu);
@@ -220,13 +214,13 @@ export default function RaporOlustur({ navigation, route }) {
       } catch (e) {
         console.log("Eski dosya silme hatası (önemli değil):", e);
       }
-      
+
       // Dosyayı kopyala
       await FileSystem.copyAsync({
         from: uri,
-        to: yeniDosyaYolu
+        to: yeniDosyaYolu,
       });
-      
+
       console.log(`PDF kopyalandı: ${yeniDosyaYolu}`);
 
       if (await Sharing.isAvailableAsync()) {
@@ -237,7 +231,10 @@ export default function RaporOlustur({ navigation, route }) {
         });
         console.log("PDF paylaşıldı");
       } else {
-        Alert.alert("Paylaşım desteklenmiyor", "Dosya konumu: " + yeniDosyaYolu);
+        Alert.alert(
+          "Paylaşım desteklenmiyor",
+          "Dosya konumu: " + yeniDosyaYolu
+        );
       }
     } catch (e) {
       console.error("PDF oluşturma hatası:", e);
@@ -265,8 +262,15 @@ export default function RaporOlustur({ navigation, route }) {
 
   return (
     <ScrollView contentContainerStyle={common.container}>
-      <Text style={common.title}>Rapor Oluştur</Text>
-      <Text style={common.subtitle}>
+      <Text
+        style={[
+          common.subtitle,
+          {
+            fontWeight: "bold", // Fontu kalın yapıyoruz
+            fontSize: 18, // Mevcut 16 punto + 2 punto = 18 punto
+          },
+        ]}
+      >
         Seçilen Sayım: {sayimNot}
       </Text>
 
@@ -281,8 +285,6 @@ export default function RaporOlustur({ navigation, route }) {
         {kart("PDF Olarak Dışa Aktar", raporPDF, "#28a745")}
         {kart("JSON Olarak Dışa Aktar", raporJSON, "#6f42c1")}
       </View>
-
-     
     </ScrollView>
   );
 }

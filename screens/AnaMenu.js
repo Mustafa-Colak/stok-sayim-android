@@ -7,6 +7,8 @@ import {
   ScrollView,
   StyleSheet,
   Alert,
+  Modal, // Modal bileşenini import ediyoruz
+  TouchableWithoutFeedback, // Dışarı tıklamayı yakalamak için
 } from "react-native";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
@@ -45,6 +47,7 @@ export default function AnaMenu() {
   const navigation = useNavigation();
   const [lisansBilgisi, setLisansBilgisi] = useState(null);
   const [kalanGun, setKalanGun] = useState(0);
+  const [modalVisible, setModalVisible] = useState(false); // Modal görünürlüğü için state
 
   // Lisans bilgilerini yükle
   const lisansBilgileriniYukle = async () => {
@@ -81,52 +84,29 @@ export default function AnaMenu() {
     }
   };
 
-  // Lisans bilgilerini göster
+  // Lisans bilgilerini göster - Güvenlik kontrolü ekledik
   const lisansBilgileriniGoster = () => {
-    if (!lisansBilgisi) return;
-
-    const lisansTipi = lisansBilgisi.tip === "ucretli" ? "Tam Sürüm" : "Ücretsiz Deneme";
-    const baslangicTarihi = lisansBilgisi.baslangicTarihi 
-      ? new Date(lisansBilgisi.baslangicTarihi).toLocaleDateString('tr-TR') 
-      : "Bilinmiyor";
-    
-    let mesaj = `Lisans Tipi: ${lisansTipi}\nBaşlangıç Tarihi: ${baslangicTarihi}`;
-    
-    if (lisansBilgisi.tip === "ucretsiz") {
-      mesaj += `\nKalan Deneme Süresi: ${kalanGun} gün`;
-      mesaj += "\n\nÜcretsiz sürüm limitleri:";
-      mesaj += "\n- Maksimum 3 aktif sayım";
-      mesaj += "\n- Sayım başına maksimum 50 ürün";
-      mesaj += "\n- 30 günlük deneme süresi";
-    } else if (lisansBilgisi.tip === "ucretli") {
-      mesaj += "\n\nTam sürümü kullanıyorsunuz. Tüm özellikler aktif.";
+    // Lisans bilgisi yüklenmeden önce tıklanırsa hata vermesin
+    if (!lisansBilgisi) {
+      Alert.alert("Bilgi", "Lisans bilgileri yükleniyor, lütfen bekleyin.");
+      return;
     }
-
-    Alert.alert(
-      "Lisans Bilgileri",
-      mesaj,
-      [
-        { 
-          text: lisansBilgisi.tip === "ucretsiz" ? "Tam Sürüme Geç" : "Tamam", 
-          onPress: () => {
-            if (lisansBilgisi.tip === "ucretsiz") {
-              navigation.navigate("Ayarlar");
-            }
-          }
-        }
-      ]
-    );
+    setModalVisible(true);
   };
 
-  // Lisans kartı için duruma göre renk ve ikon belirle
+  // Lisans kartı için duruma göre renk ve ikon belirle - Güvenlik kontrolü ekledik
   const getLisansKartBilgileri = () => {
+    // Varsayılan değerler tanımla
+    const varsayilanBilgiler = {
+      renk: "#6c757d",
+      ikon: "help-circle-outline",
+      baslik: "Lisans Bilgisi",
+      aciklama: "Yükleniyor..."
+    };
+
+    // Lisans bilgisi yoksa varsayılan değerleri döndür
     if (!lisansBilgisi) {
-      return {
-        renk: "#6c757d",
-        ikon: "help-circle-outline",
-        baslik: "Lisans Bilgisi",
-        aciklama: "Yükleniyor..."
-      };
+      return varsayilanBilgiler;
     }
 
     if (lisansBilgisi.tip === "ucretli") {
@@ -156,6 +136,31 @@ export default function AnaMenu() {
     }
   };
 
+  // Lisans bilgisi içeriğini hazırlayan fonksiyon - Güvenlik kontrolü ekledik
+  const getLisansBilgisiIcerigi = () => {
+    if (!lisansBilgisi) return "Lisans bilgileri yüklenemedi.";
+
+    const lisansTipi = lisansBilgisi.tip === "ucretli" ? "Tam Sürüm" : "Ücretsiz Deneme";
+    const baslangicTarihi = lisansBilgisi.baslangicTarihi 
+      ? new Date(lisansBilgisi.baslangicTarihi).toLocaleDateString('tr-TR') 
+      : "Bilinmiyor";
+    
+    let mesaj = `Lisans Tipi: ${lisansTipi}\nBaşlangıç Tarihi: ${baslangicTarihi}`;
+    
+    if (lisansBilgisi.tip === "ucretsiz") {
+      mesaj += `\nKalan Deneme Süresi: ${kalanGun} gün`;
+      mesaj += "\n\nÜcretsiz sürüm limitleri:";
+      mesaj += "\n- Maksimum 3 aktif sayım";
+      mesaj += "\n- Sayım başına maksimum 50 ürün";
+      mesaj += "\n- 30 günlük deneme süresi";
+    } else if (lisansBilgisi.tip === "ucretli") {
+      mesaj += "\n\nTam sürümü kullanıyorsunuz. Tüm özellikler aktif.";
+    }
+
+    return mesaj;
+  };
+
+  // Her render'da lisansKartBilgileri'ni hesapla
   const lisansKartBilgileri = getLisansKartBilgileri();
 
   return (
@@ -181,26 +186,26 @@ export default function AnaMenu() {
           </TouchableOpacity>
         ))}
 
-        {/* Lisans Bilgisi Kartı - En altta */}
+        {/* Lisans Bilgisi Kartı - Güvenlik kontrolü ekledik */}
         <TouchableOpacity
           style={[
             styles.kart, 
             { 
-              borderLeftColor: lisansKartBilgileri.renk, 
+              borderLeftColor: lisansKartBilgileri?.renk || "#6c757d", 
               borderLeftWidth: 5,
-              marginTop: 20 // Üstteki kartlardan biraz daha ayrı durması için
+              marginTop: 20
             }
           ]}
           onPress={lisansBilgileriniGoster}
         >
           <MaterialCommunityIcons
-            name={lisansKartBilgileri.ikon}
+            name={lisansKartBilgileri?.ikon || "help-circle-outline"}
             size={30}
-            color={lisansKartBilgileri.renk}
+            color={lisansKartBilgileri?.renk || "#6c757d"}
           />
           <View style={{ flex: 1, marginLeft: 16 }}>
-            <Text style={styles.kartBaslik}>{lisansKartBilgileri.baslik}</Text>
-            <Text style={styles.kartAciklama}>{lisansKartBilgileri.aciklama}</Text>
+            <Text style={styles.kartBaslik}>{lisansKartBilgileri?.baslik || "Lisans Bilgisi"}</Text>
+            <Text style={styles.kartAciklama}>{lisansKartBilgileri?.aciklama || "Yükleniyor..."}</Text>
           </View>
           <MaterialCommunityIcons
             name="chevron-right"
@@ -209,6 +214,107 @@ export default function AnaMenu() {
           />
         </TouchableOpacity>
       </ScrollView>
+
+      {/* Lisans Bilgisi Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setModalVisible(false)}>
+          <View style={modalStyles.centeredView}>
+            <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
+              <View style={modalStyles.modalView}>
+                <Text style={modalStyles.modalTitle}>Lisans Bilgileri</Text>
+                <Text style={modalStyles.modalText}>{getLisansBilgisiIcerigi()}</Text>
+                
+                <View style={modalStyles.buttonContainer}>
+                  {lisansBilgisi?.tip === "ucretsiz" && (
+                    <TouchableOpacity
+                      style={[modalStyles.button, modalStyles.buttonUpgrade]}
+                      onPress={() => {
+                        setModalVisible(false);
+                        navigation.navigate("Ayarlar");
+                      }}
+                    >
+                      <Text style={modalStyles.buttonText}>Tam Sürüme Geç</Text>
+                    </TouchableOpacity>
+                  )}
+                  
+                  <TouchableOpacity
+                    style={[modalStyles.button, modalStyles.buttonClose]}
+                    onPress={() => setModalVisible(false)}
+                  >
+                    <Text style={modalStyles.buttonText}>Kapat</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
     </View>
   );
 }
+
+// Modal için yeni stiller
+const modalStyles = StyleSheet.create({
+  centeredView: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: 'rgba(0, 0, 0, 0.5)', // Yarı saydam arka plan
+  },
+  modalView: {
+    margin: 20,
+    backgroundColor: "white",
+    borderRadius: 12,
+    padding: 25,
+    alignItems: "flex-start",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+    width: '85%',
+    maxWidth: 400,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    marginBottom: 15,
+    alignSelf: "center",
+  },
+  modalText: {
+    marginBottom: 20,
+    fontSize: 16,
+    lineHeight: 24,
+  },
+  buttonContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    width: "100%",
+  },
+  button: {
+    borderRadius: 8,
+    padding: 10,
+    elevation: 2,
+    minWidth: 100,
+    alignItems: "center",
+  },
+  buttonUpgrade: {
+    backgroundColor: "#007bff",
+  },
+  buttonClose: {
+    backgroundColor: "#6c757d",
+  },
+  buttonText: {
+    color: "white",
+    fontWeight: "bold",
+    textAlign: "center",
+  },
+});

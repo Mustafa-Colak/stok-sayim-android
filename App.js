@@ -2,7 +2,8 @@
 import React from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
-import { MaterialCommunityIcons } from "@expo/vector-icons"; // ✅ ikon importu
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { View, Text, Image, StyleSheet, TouchableOpacity } from "react-native";
 
 import GirisEkrani from "./screens/GirisEkrani";
 import AnaMenu from "./screens/AnaMenu";
@@ -13,77 +14,73 @@ import YeniSayim from "./screens/YeniSayim";
 
 const Stack = createStackNavigator();
 
+// UstaHesap logo bileşeni - Her zaman solda
+const UstaHesapLogo = () => (
+  <Image source={require("./assets/ustahesap-logo.png")} style={styles.logo} />
+);
+
+// Geri butonu bileşeni - Sağda
+const CustomBackButton = ({ onPress }) => (
+  <TouchableOpacity onPress={onPress} style={styles.backButton}>
+    <MaterialCommunityIcons name="arrow-left" size={28} color="#fff" />
+  </TouchableOpacity>
+);
+
 export default function App() {
   return (
     <NavigationContainer>
       <Stack.Navigator
-        screenOptions={{
-          headerStyle: { backgroundColor: "#007bff" },
+        screenOptions={({ navigation }) => ({
+          headerStyle: { backgroundColor: "#00a0b0" }, // UstaHesap turkuaz rengi
           headerTintColor: "#fff",
-          headerTitleStyle: { fontWeight: "bold" },
-        }}
+          headerTitleStyle: {
+            fontWeight: "bold",
+            fontSize: 22, // Font boyutunu 22 olarak değiştirdim (önceki değer 18 idi)
+          },
+          headerTitleAlign: "center", // Başlık yazısı ortada
+          headerLeft: () => <UstaHesapLogo />, // Logo her zaman solda
+          // Varsayılan geri butonunu kaldırıyoruz
+          headerBackVisible: false,
+        })}
       >
-        <Stack.Screen name="Giris" component={GirisEkrani} />
-        <Stack.Screen name="AnaMenu" component={AnaMenu} />
+        <Stack.Screen
+          name="Giris"
+          component={GirisEkrani}
+          options={{
+            title: "Giriş",
+            // Giriş ekranında geri butonu yok
+          }}
+        />
+
+        <Stack.Screen
+          name="AnaMenu"
+          component={AnaMenu}
+          options={{
+            title: "Ana Menü",
+            // Ana Menü ekranında geri butonu yok
+          }}
+        />
 
         <Stack.Screen
           name="SayimListesi"
           component={SayimListesi}
-          options={{
-            title: "Sayım Listesi", // Bu başlık SayimListesi içinde dinamik olarak ayarlanıyor
-            headerBackTitleVisible: false,
-            headerTitleAlign: "center",
-            // headerTintColor: "#fff", // screenOptions'tan miras alınıyor
-            // headerStyle: { backgroundColor: "#007bff" }, // screenOptions'tan miras alınıyor
-            headerBackImage: () => (
-              <MaterialCommunityIcons
-                name="arrow-left"
-                size={32}
-                color="#fff"
-                style={{ marginLeft: 10 }}
-              />
+          options={({ navigation }) => ({
+            title: "Sayım Listesi",
+            // Geri butonu sağda
+            headerRight: () => (
+              <CustomBackButton onPress={() => navigation.goBack()} />
             ),
-          }}
+          })}
         />
 
         <Stack.Screen
           name="SayimDetay"
           component={SayimDetay}
-          options={({ route, navigation }) => ({
-            // navigation eklendi
-            title: `Stok Sayım / ${route.params?.sayimNot || ""}`, // sayimAd -> sayimNot
-            // headerTintColor: "#fff", // screenOptions'tan miras alınıyor
-            // headerStyle: { backgroundColor: "#007bff" }, // screenOptions'tan miras alınıyor
-            // headerTitleStyle: { fontWeight: "bold" }, // screenOptions'tan miras alınıyor
-            headerBackImage: () => (
-              <MaterialCommunityIcons
-                name="arrow-left"
-                size={32}
-                color="#fff"
-                style={{ marginLeft: 10 }}
-              />
-            ),
+          options={({ navigation }) => ({
+            title: "Sayım Detayı", // Değiştirildi: Sabit başlık
+            // Sadece geri butonu var, rapor butonu kaldırıldı
             headerRight: () => (
-              <MaterialCommunityIcons
-                name="file-document-outline"
-                size={24}
-                color="#fff"
-                style={{ marginRight: 16 }}
-                onPress={() => {
-                  if (route.params?.sayimId && route.params?.sayimNot) {
-                    navigation.navigate("RaporOlustur", {
-                      sayimId: route.params.sayimId,
-                      sayimNot: route.params.sayimNot,
-                    });
-                  } else {
-                    console.warn(
-                      "Rapor oluşturmak için sayimId veya sayimNot eksik."
-                    );
-                    // İsteğe bağlı olarak kullanıcıya bir Alert gösterebilirsiniz.
-                    // Alert.alert("Hata", "Rapor oluşturmak için gerekli bilgiler eksik.");
-                  }
-                }}
-              />
+              <CustomBackButton onPress={() => navigation.goBack()} />
             ),
           })}
         />
@@ -91,42 +88,48 @@ export default function App() {
         <Stack.Screen
           name="RaporOlustur"
           component={RaporOlustur}
-          options={{
-            // Bu başlık RaporOlustur içinde dinamik olarak ayarlanıyor
+          options={({ navigation }) => ({
             title: "Rapor Oluştur",
-            // headerTintColor: "#fff", // screenOptions'tan miras alınıyor
-            // headerStyle: { backgroundColor: "#007bff" }, // screenOptions'tan miras alınıyor
-            // headerTitleStyle: { fontWeight: "bold" }, // screenOptions'tan miras alınıyor
-            headerBackImage: () => (
-              <MaterialCommunityIcons
-                name="arrow-left"
-                size={32}
-                color="#fff"
-                style={{ marginLeft: 10 }}
-              />
+            // Geri butonu sağda
+            headerRight: () => (
+              <CustomBackButton onPress={() => navigation.goBack()} />
             ),
-          }}
+          })}
         />
 
         <Stack.Screen
           name="YeniSayim"
           component={YeniSayim}
-          options={{
+          options={({ navigation }) => ({
             title: "Yeni Sayım",
-            // headerTintColor: "#fff", // screenOptions'tan miras alınıyor
-            // headerStyle: { backgroundColor: "#007bff" }, // screenOptions'tan miras alınıyor
-            // headerTitleStyle: { fontWeight: "bold" }, // screenOptions'tan miras alınıyor
-            headerBackImage: () => (
-              <MaterialCommunityIcons
-                name="arrow-left"
-                size={32}
-                color="#fff"
-                style={{ marginLeft: 10 }}
-              />
+            // Geri butonu sağda
+            headerRight: () => (
+              <CustomBackButton onPress={() => navigation.goBack()} />
             ),
-          }}
+          })}
         />
       </Stack.Navigator>
     </NavigationContainer>
   );
 }
+
+const styles = StyleSheet.create({
+  logo: {
+    width: 105,
+    height: 50,
+    resizeMode: "contain",
+    marginLeft: 16,
+  },
+  backButton: {
+    padding: 8,
+    marginRight: 16,
+  },
+  headerRightContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  reportButton: {
+    padding: 8,
+    marginRight: 8,
+  },
+});

@@ -52,7 +52,7 @@ export default function SayimListesi({ navigation, route }) {
     // Rapor oluşturma amacıyla açıldıysa başlığı güncelle
     if (isForReport) {
       navigation.setOptions({
-        title: "Rapor İçin Sayım Seçin",
+        title: "Raporlama",
       });
     }
   }, []);
@@ -287,7 +287,7 @@ export default function SayimListesi({ navigation, route }) {
   return (
     <View style={common.container}>
       <Text style={common.title}>
-        {isForReport ? "Rapor İçin Sayım Seçin" : "Sayım Listesi"}
+        {isForReport ? "Rapor İçin Sayım Seçin" : "Sayım Seçin"}
       </Text>
 
       {/* Kalan gün uyarısı */}
