@@ -27,6 +27,8 @@ export default function RaporOlustur({ navigation, route }) {
 
   const STORAGE_KEY = `sayim_${sayimId}`;
   const [urunler, setUrunler] = useState([]);
+  // Özel alanlar için state
+  const [ozelAlanlar, setOzelAlanlar] = useState([]);
   // Dosya adını otomatik olarak sayım notundan oluştur
   const dosyaAdi = sayimNot
     ? sayimNot.replace(/\s+/g, "_").toLowerCase()
@@ -43,6 +45,14 @@ export default function RaporOlustur({ navigation, route }) {
       if (!sayimId) return;
 
       try {
+        // Özel alanları yükle
+        const alanlarJson = await AsyncStorage.getItem("ozel_alanlar");
+        if (alanlarJson) {
+          const alanlar = JSON.parse(alanlarJson);
+          setOzelAlanlar(alanlar);
+        }
+
+        // Ürünleri yükle
         const veri = await AsyncStorage.getItem(STORAGE_KEY);
         if (veri) {
           const parsedData = JSON.parse(veri);
@@ -50,6 +60,7 @@ export default function RaporOlustur({ navigation, route }) {
           const urunlerWithAd = parsedData.map((item) => ({
             ...item,
             ad: item.ad || "", // Eğer ad yoksa veya null/undefined ise boş string yap
+            ozelAlanlar: item.ozelAlanlar || {} // Eğer ozelAlanlar yoksa boş obje yap
           }));
           setUrunler(urunlerWithAd);
           console.log(`${urunlerWithAd.length} ürün yüklendi`);
@@ -66,31 +77,124 @@ export default function RaporOlustur({ navigation, route }) {
     yukle();
   }, [sayimId, STORAGE_KEY]);
 
+  // Aktif özel alanları filtrele
+  const aktifOzelAlanlar = ozelAlanlar.filter(alan => alan.aktif);
+
+  // Ürünlerde kullanılmış olan tüm özel alanları tespit et
+  const kullanilmisOzelAlanlar = React.useMemo(() => {
+    // Tüm özel alanları içeren bir harita oluştur
+    const tumAlanlar = {};
+    ozelAlanlar.forEach(alan => {
+      tumAlanlar[alan.id] = { ...alan };
+    });
+    
+    // Ürünlerde kullanılmış alanları tespit et
+    const kullanilmisAlanIds = new Set();
+    urunler.forEach(urun => {
+      if (urun.ozelAlanlar) {
+        Object.keys(urun.ozelAlanlar).forEach(alanId => {
+          // Eğer bu alanda bir değer varsa ve boş değilse
+          if (urun.ozelAlanlar[alanId] && urun.ozelAlanlar[alanId].trim() !== '') {
+            kullanilmisAlanIds.add(alanId);
+          }
+        });
+      }
+    });
+    
+    // Kullanılmış alanları döndür
+    return ozelAlanlar.filter(alan => kullanilmisAlanIds.has(alan.id));
+  }, [urunler, ozelAlanlar]);
+
+  // Raporlarda gösterilecek alanlar - hem aktif hem de kullanılmış alanları içerir
+  const gosterilecekAlanlar = React.useMemo(() => {
+    // Önce aktif alanları ekle
+    const alanMap = new Map();
+    aktifOzelAlanlar.forEach(alan => {
+      alanMap.set(alan.id, alan);
+    });
+    
+    // Sonra kullanılmış ama aktif olmayan alanları ekle
+    kullanilmisOzelAlanlar.forEach(alan => {
+      if (!alanMap.has(alan.id)) {
+        alanMap.set(alan.id, alan);
+      }
+    });
+    
+    // Map'ten array'e dönüştür
+    return Array.from(alanMap.values());
+  }, [aktifOzelAlanlar, kullanilmisOzelAlanlar]);
+
   const csvUret = () => {
     if (urunler.length === 0) return null;
-    // Kolon sıralamasını değiştirdim: Barkod - Miktar - Not
-    let csv = "Barkod,Miktar,Not\n";
+    
+    // CSV başlık satırını oluştur - İstenen sıralama: Barkod, Özel Alanlar, Not, Miktar
+    let basliklar = ["Barkod"];
+    
+    // Gösterilecek özel alanları başlıklara ekle
+    gosterilecekAlanlar.forEach(alan => {
+      basliklar.push(alan.isim);
+    });
+    
+    // Not ve Miktar alanlarını sona ekle
+    basliklar.push("Not", "Miktar");
+    
+    // CSV başlık satırını oluştur
+    let csv = basliklar.join(",") + "\n";
+    
+    // Her ürün için satır oluştur
     urunler.forEach((u) => {
       // CSV formatı için özel karakterleri düzgün escape et ve undefined/null kontrolü yap
       const barkod = u.barkod
         ? `"${String(u.barkod).replace(/"/g, '""')}"`
         : '""';
       const ad = u.ad ? `"${String(u.ad).replace(/"/g, '""')}"` : '""';
-      // Sıralamayı değiştirdim: barkod, miktar, ad (not)
-      csv += `${barkod},${u.miktar},${ad}\n`;
+      
+      // Barkod ile başla
+      let satir = barkod;
+      
+      // Gösterilecek özel alanları ekle
+      gosterilecekAlanlar.forEach(alan => {
+        const deger = u.ozelAlanlar && u.ozelAlanlar[alan.id]
+          ? `"${String(u.ozelAlanlar[alan.id]).replace(/"/g, '""')}"`
+          : '""';
+        satir += `,${deger}`;
+      });
+      
+      // Not ve Miktar alanlarını ekle
+      satir += `,${ad},${u.miktar}`;
+      
+      csv += satir + "\n";
     });
+    
     return csv;
   };
 
   const jsonUret = () => {
     if (urunler.length === 0) return null;
-    // JSON formatında da alanların sırasını değiştirdim
+    
+    // JSON formatında tüm aktif alanları içeren nesneler oluştur
     return JSON.stringify(
-      urunler.map((u) => ({
-        barkod: u.barkod || "",
-        miktar: u.miktar,
-        not: u.ad || "", // ad alanını not olarak adlandırdım
-      })),
+      urunler.map((u) => {
+        // İstenen sıralama: Barkod, Özel Alanlar, Not, Miktar
+        const urunJson = {
+          barkod: u.barkod || "",
+        };
+        
+        // Gösterilecek özel alanları ekle
+        gosterilecekAlanlar.forEach(alan => {
+          if (u.ozelAlanlar && u.ozelAlanlar[alan.id] !== undefined) {
+            urunJson[alan.isim] = u.ozelAlanlar[alan.id];
+          } else {
+            urunJson[alan.isim] = "";
+          }
+        });
+        
+        // Not ve Miktar alanlarını ekle
+        urunJson.not = u.ad || "";
+        urunJson.miktar = u.miktar;
+        
+        return urunJson;
+      }),
       null,
       2
     );
@@ -111,14 +215,30 @@ export default function RaporOlustur({ navigation, route }) {
         .replace(/'/g, "&#039;");
     };
 
-    // Tablo satırlarını oluştururken sıralamayı değiştirdim
+    // Tablo başlıkları - İstenen sıralama: Barkod, Özel Alanlar, Not, Miktar
+    let tableHeaders = `
+      <tr>
+        <th>Barkod</th>
+        ${gosterilecekAlanlar.map(alan => `<th>${escapeHTML(alan.isim)}</th>`).join('')}
+        <th>Not</th>
+        <th>Miktar</th>
+      </tr>
+    `;
+
+    // Tablo satırlarını oluştur
     const rows = urunler
       .map(
         (u) => `
       <tr>
         <td>${escapeHTML(u.barkod || "")}</td>
-        <td>${u.miktar}</td>
+        ${gosterilecekAlanlar.map(alan => {
+          const deger = u.ozelAlanlar && u.ozelAlanlar[alan.id] !== undefined 
+            ? escapeHTML(u.ozelAlanlar[alan.id]) 
+            : "";
+          return `<td>${deger}</td>`;
+        }).join('')}
         <td>${escapeHTML(u.ad || "")}</td>
+        <td>${u.miktar}</td>
       </tr>
     `
       )
@@ -156,7 +276,7 @@ export default function RaporOlustur({ navigation, route }) {
           <p>Tarih: ${new Date().toLocaleDateString()}</p>
           <p>Toplam Ürün: ${urunler.length}</p>
           <table>
-            <tr><th>Barkod</th><th>Miktar</th><th>Not</th></tr>
+            ${tableHeaders}
             ${rows}
           </table>
         </body>
@@ -295,6 +415,20 @@ export default function RaporOlustur({ navigation, route }) {
     cardTitle: {
       fontSize: 18,
       fontWeight: "bold",
+    },
+    alanBilgisi: {
+      color: tema.ikincilMetin,
+      fontSize: 14,
+      textAlign: "center",
+      marginTop: 10,
+      fontStyle: "italic",
+    },
+    pasifAlanUyari: {
+      color: karanlikTema ? "#ff9800" : "#e65100",
+      fontSize: 14,
+      textAlign: "center",
+      marginTop: 5,
+      fontStyle: "italic",
     }
   });
 
@@ -315,6 +449,11 @@ export default function RaporOlustur({ navigation, route }) {
       </TouchableOpacity>
     );
   };
+
+  // Pasif ama kullanılmış alanları bul
+  const pasifKullanilmisAlanlar = kullanilmisOzelAlanlar.filter(
+    alan => !aktifOzelAlanlar.some(aktifAlan => aktifAlan.id === alan.id)
+  );
 
   // Eğer sayimId veya sayimNot yoksa, boş bir ekran göster veya yükleniyor mesajı
   if (!sayimId || !sayimNot) {
@@ -337,6 +476,18 @@ export default function RaporOlustur({ navigation, route }) {
       <Text style={dinamikStiller.urunSayisi}>
         Toplam {urunler.length} Ürün
       </Text>
+      
+      {aktifOzelAlanlar.length > 0 && (
+        <Text style={dinamikStiller.alanBilgisi}>
+          Aktif Özel Alanlar: {aktifOzelAlanlar.map(alan => alan.isim).join(', ')}
+        </Text>
+      )}
+      
+      {pasifKullanilmisAlanlar.length > 0 && (
+        <Text style={dinamikStiller.pasifAlanUyari}>
+          Pasif Edilmiş Veri İçeren Alanlar: {pasifKullanilmisAlanlar.map(alan => alan.isim).join(', ')}
+        </Text>
+      )}
 
       <View style={dinamikStiller.cardContainer}>
         {kart("CSV Olarak Dışa Aktar", raporCSV, "#007bff")}
