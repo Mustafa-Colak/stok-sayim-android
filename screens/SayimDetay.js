@@ -42,7 +42,7 @@ export default function SayimDetay({ route, navigation }) {
   const [urunler, setUrunler] = useState([]);
   const [gosterilecekUrunler, setGosterilecekUrunler] = useState([]); // Sadece gösterim için
   const [barkod, setBarkod] = useState("");
-  const [miktar, setMiktar] = useState("");
+  const [miktar, setMiktar] = useState("1"); // Varsayılan değer 1 olarak ayarlandı
   const [not, setNot] = useState(""); // Not alanı için state eklendi
   const [sayimDurum, setSayimDurum] = useState("");
   const [hizliMod, setHizliMod] = useState(false);
@@ -375,10 +375,19 @@ export default function SayimDetay({ route, navigation }) {
       sayimDurumuGuncelle("devam");
     }
 
-    // Alanları temizle
+    // Alanları temizle - miktar hariç
     setBarkod("");
-    if (!hizliMod) setMiktar("1"); // Normal modda miktar alanını "1" olarak ayarla
     setNot(""); // Not alanını temizle
+    
+    // Özel alanları temizle
+    const yeniDegerler = {};
+    ozelAlanlar.forEach((alan) => {
+      if (alan.aktif) {
+        yeniDegerler[alan.id] = "";
+      }
+    });
+    setAlanDegerleri(yeniDegerler);
+    alanDegerleriniKaydet(yeniDegerler);
 
     // Barkod alanına odaklan
     if (barkodInputRef.current && klavyeOtomatikAcilsin) {
@@ -495,11 +504,17 @@ export default function SayimDetay({ route, navigation }) {
       backgroundColor: tema.arkaplan,
       padding: 16,
     },
-    title: {
-      fontSize: 24,
-      fontWeight: "bold",
+    headerContainer: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
       marginBottom: 10,
+    },
+    title: {
+      fontSize: 20,
+      fontWeight: "bold",
       color: tema.metin,
+      flex: 1,
     },
     subtitle: {
       fontSize: 16,
@@ -510,28 +525,65 @@ export default function SayimDetay({ route, navigation }) {
     modeContainer: {
       flexDirection: "row",
       alignItems: "center",
-      justifyContent: "space-between",
-      marginBottom: 10,
-      paddingHorizontal: 5,
-      paddingVertical: 8,
-      backgroundColor: tema.kart,
-      borderRadius: 4,
+      marginLeft: 10,
     },
     modeText: {
-      fontSize: 16,
+      fontSize: 14,
       color: tema.metin,
+      marginRight: 5,
     },
     inputContainer: {
       marginBottom: 10,
     },
+    inputRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginBottom: 8,
+    },
+    inputLabel: {
+      color: tema.metin,
+      fontSize: 14,
+      fontWeight: "bold",
+      width: 60,
+    },
     input: {
+      flex: 1,
       borderWidth: 1,
       borderColor: tema.girdiBorder,
       backgroundColor: tema.girdi,
       color: tema.metin,
       borderRadius: 4,
       padding: 10,
-      marginBottom: 8,
+      fontSize: 16,
+    },
+    halfInputContainer: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+    },
+    halfInput: {
+      flex: 1,
+      borderWidth: 1,
+      borderColor: tema.girdiBorder,
+      backgroundColor: tema.girdi,
+      color: tema.metin,
+      borderRadius: 4,
+      padding: 10,
+      fontSize: 16,
+    },
+    miktarContainer: {
+      width: 120, // Miktar alanını daraltıyoruz
+      flexDirection: "row",
+      alignItems: "center",
+    },
+    miktarInput: {
+      flex: 1,
+      borderWidth: 1,
+      borderColor: tema.girdiBorder,
+      backgroundColor: tema.girdi,
+      color: tema.metin,
+      borderRadius: 4,
+      padding: 10,
       fontSize: 16,
     },
     addBtn: {
@@ -659,7 +711,20 @@ export default function SayimDetay({ route, navigation }) {
       style={dinamikStiller.container}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <Text style={dinamikStiller.title}>{sayimNot}</Text>
+      {/* Başlık ve Hızlı Sayım Modu aynı satırda */}
+      <View style={dinamikStiller.headerContainer}>
+        <Text style={dinamikStiller.title}>{sayimNot}</Text>
+        <View style={dinamikStiller.modeContainer}>
+          <Text style={dinamikStiller.modeText}>Hızlı Mod:</Text>
+          <Switch
+            value={hizliMod}
+            onValueChange={modTercihiniKaydet}
+            trackColor={{ false: karanlikTema ? "#555" : "#767577", true: karanlikTema ? "#3a6ea5" : "#81b0ff" }}
+            thumbColor={hizliMod ? tema.buton : karanlikTema ? "#f4f3f4" : "#f4f3f4"}
+            disabled={aktifAlanVarMi} // Aktif alan varsa hızlı mod seçilemez
+          />
+        </View>
+      </View>
 
       {/* Kalan gün uyarısı */}
       {kalanGun > 0 && kalanGun <= 5 && (
@@ -676,78 +741,77 @@ export default function SayimDetay({ route, navigation }) {
         </View>
       )}
 
-      <View style={dinamikStiller.modeContainer}>
-        <Text style={dinamikStiller.modeText}>Hızlı Sayım Modu:</Text>
-        <Switch
-          value={hizliMod}
-          onValueChange={modTercihiniKaydet}
-          trackColor={{ false: karanlikTema ? "#555" : "#767577", true: karanlikTema ? "#3a6ea5" : "#81b0ff" }}
-          thumbColor={hizliMod ? tema.buton : karanlikTema ? "#f4f3f4" : "#f4f3f4"}
-          disabled={aktifAlanVarMi} // Aktif alan varsa hızlı mod seçilemez
-        />
-      </View>
-
-      {/* Veri giriş alanları */}
+      {/* Veri giriş alanları - Yeni sıralama: Barkod -> Özel Alanlar -> Not -> Miktar */}
       <View style={dinamikStiller.inputContainer}>
-        <TextInput
-          ref={barkodInputRef}
-          value={barkod}
-          onChangeText={setBarkod}
-          placeholder="Barkod"
-          placeholderTextColor={tema.ikincilMetin}
-          style={dinamikStiller.input}
-          onSubmitEditing={barkodGirisiniTamamla}
-          returnKeyType={hizliMod ? "done" : "next"}
-          blurOnSubmit={false}
-          autoFocus={false} // Otomatik odaklanmayı kapat
-        />
-        {!hizliMod && (
+        {/* Barkod alanı */}
+        <View style={dinamikStiller.inputRow}>
+          <Text style={dinamikStiller.inputLabel}>Barkod:</Text>
           <TextInput
-            value={miktar}
-            onChangeText={setMiktar}
-            placeholder="Miktar"
-            placeholderTextColor={tema.ikincilMetin}
-            keyboardType="numeric"
-            style={dinamikStiller.input}
-            returnKeyType="next"
-            blurOnSubmit={false}
-          />
-        )}
-        {/* Not alanını sadece hızlı mod seçili değilse göster */}
-        {!hizliMod && (
-          <TextInput
-            value={not}
-            onChangeText={setNot}
-            placeholder="Not (opsiyonel)"
+            ref={barkodInputRef}
+            value={barkod}
+            onChangeText={setBarkod}
+            placeholder="Barkod"
             placeholderTextColor={tema.ikincilMetin}
             style={dinamikStiller.input}
-            returnKeyType={aktifAlanVarMi ? "next" : "done"}
+            onSubmitEditing={barkodGirisiniTamamla}
+            returnKeyType={hizliMod ? "done" : "next"}
             blurOnSubmit={false}
+            autoFocus={false} // Otomatik odaklanmayı kapat
           />
-        )}
+        </View>
 
         {/* Özel alanlar */}
-        {ozelAlanlar.map((alan) => {
+        {ozelAlanlar.map((alan, index) => {
           if (alan.aktif) {
             return (
-              <TextInput
-                key={alan.id}
-                value={alanDegerleri[alan.id] || ""}
-                onChangeText={(text) => alanDegeriniDegistir(alan.id, text)}
-                placeholder={alan.isim}
-                placeholderTextColor={tema.ikincilMetin}
-                style={dinamikStiller.input}
-                returnKeyType={
-                  alan.id === ozelAlanlar[ozelAlanlar.length - 1].id
-                    ? "done"
-                    : "next"
-                }
-                blurOnSubmit={false}
-              />
+              <View key={alan.id} style={dinamikStiller.inputRow}>
+                <Text style={dinamikStiller.inputLabel}>{alan.isim}:</Text>
+                <TextInput
+                  value={alanDegerleri[alan.id] || ""}
+                  onChangeText={(text) => alanDegeriniDegistir(alan.id, text)}
+                  placeholder={alan.isim}
+                  placeholderTextColor={tema.ikincilMetin}
+                  style={dinamikStiller.input}
+                  returnKeyType="next"
+                  blurOnSubmit={false}
+                />
+              </View>
             );
           }
           return null;
         })}
+
+        {/* Not ve Miktar alanları yan yana - Not alanı diğer alanlarla aynı hizada */}
+        {!hizliMod && (
+          <View style={dinamikStiller.inputRow}>
+            <Text style={dinamikStiller.inputLabel}>Not:</Text>
+            <View style={{flex: 1, flexDirection: 'row'}}>
+              <TextInput
+                value={not}
+                onChangeText={setNot}
+                placeholder="Not (opsiyonel)"
+                placeholderTextColor={tema.ikincilMetin}
+                style={[dinamikStiller.input, {marginRight: 8}]}
+                returnKeyType="next"
+                blurOnSubmit={false}
+              />
+              
+              <View style={dinamikStiller.miktarContainer}>
+                <Text style={[dinamikStiller.inputLabel, {width: 55}]}>Miktar:</Text>
+                <TextInput
+                  value={miktar}
+                  onChangeText={setMiktar}
+                  placeholder="Adet"
+                  placeholderTextColor={tema.ikincilMetin}
+                  keyboardType="numeric"
+                  style={dinamikStiller.miktarInput}
+                  returnKeyType="done"
+                  blurOnSubmit={false}
+                />
+              </View>
+            </View>
+          </View>
+        )}
       </View>
 
       {/* Klavye açma butonu */}
