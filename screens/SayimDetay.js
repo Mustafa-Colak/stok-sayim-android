@@ -46,6 +46,7 @@ export default function SayimDetay({ route, navigation }) {
   const [hizliMod, setHizliMod] = useState(false);
   const [yukleniyor, setYukleniyor] = useState(true);
   const [kalanGun, setKalanGun] = useState(0);
+  const [klavyeOtomatikAcilsin, setKlavyeOtomatikAcilsin] = useState(false); // Klavye kontrolü için yeni state
 
   // Barkod input referansı
   const barkodInputRef = useRef(null);
@@ -64,6 +65,11 @@ export default function SayimDetay({ route, navigation }) {
       durumuYukle();
       modTercihiniYukle();
       lisansDurumunuKontrolEt();
+
+      // Veriler yüklendikten 1 saniye sonra klavye kontrolünü aktif et
+      setTimeout(() => {
+        setKlavyeOtomatikAcilsin(true);
+      }, 1000);
     });
 
     // Kaydetme zamanlayıcısı
@@ -90,9 +96,9 @@ export default function SayimDetay({ route, navigation }) {
     };
   }, [sayimId]);
 
-  // Barkod alanına odaklanma
+  // Barkod alanına odaklanma - Otomatik odaklanmayı kontrol ediyoruz
   useEffect(() => {
-    if (!yukleniyor) {
+    if (!yukleniyor && klavyeOtomatikAcilsin) {
       const timer = setTimeout(() => {
         if (barkodInputRef.current) {
           barkodInputRef.current.focus();
@@ -100,7 +106,7 @@ export default function SayimDetay({ route, navigation }) {
       }, 100);
       return () => clearTimeout(timer);
     }
-  }, [yukleniyor]);
+  }, [yukleniyor, klavyeOtomatikAcilsin]);
 
   // Lisans durumunu kontrol et
   const lisansDurumunuKontrolEt = async () => {
@@ -161,7 +167,7 @@ export default function SayimDetay({ route, navigation }) {
 
     // Mod değişikliğinde barkod alanına odaklan
     setTimeout(() => {
-      if (barkodInputRef.current) {
+      if (barkodInputRef.current && klavyeOtomatikAcilsin) {
         barkodInputRef.current.focus();
       }
     }, 100);
@@ -277,7 +283,7 @@ export default function SayimDetay({ route, navigation }) {
     setNot(""); // Not alanını temizle
 
     // Barkod alanına odaklan
-    if (barkodInputRef.current) {
+    if (barkodInputRef.current && klavyeOtomatikAcilsin) {
       barkodInputRef.current.focus();
     }
   };
@@ -344,7 +350,10 @@ export default function SayimDetay({ route, navigation }) {
 
     await sayimDurumuGuncelle("kapandi");
     Alert.alert("Sayım Kapatıldı", "Bu sayım kapanmış olarak işaretlendi.");
-    navigation.goBack();
+
+    // Durumu SayimListesi ekranına yansıtmak için
+    // navigation.getParent() yerine doğrudan navigation.navigate kullanıyoruz
+    navigation.navigate("SayimListesi", { durumuGuncelle: true });
   };
 
   const sayimaDevamEt = async () => {
@@ -370,6 +379,14 @@ export default function SayimDetay({ route, navigation }) {
   const barkodGirisiniTamamla = () => {
     if (hizliMod) {
       urunEkle();
+    }
+  };
+
+  // Klavyeyi manuel olarak açma fonksiyonu
+  const klavyeyiAc = () => {
+    setKlavyeOtomatikAcilsin(true);
+    if (barkodInputRef.current) {
+      barkodInputRef.current.focus();
     }
   };
 
@@ -418,11 +435,8 @@ export default function SayimDetay({ route, navigation }) {
           thumbColor={hizliMod ? "#007bff" : "#f4f3f4"}
         />
       </View>
-      <Text style={styles.modeDescription}>
-        {hizliMod
-          ? "Hızlı mod: Sadece barkod girin, miktar otomatik 1 olarak eklenir."
-          : "Manuel mod: Barkod ve miktar girmeniz gerekir."}
-      </Text>
+
+      {/* Veri giriş alanları */}
       <View style={styles.inputContainer}>
         <TextInput
           ref={barkodInputRef}
@@ -433,7 +447,7 @@ export default function SayimDetay({ route, navigation }) {
           onSubmitEditing={barkodGirisiniTamamla}
           returnKeyType={hizliMod ? "done" : "next"}
           blurOnSubmit={false}
-          autoFocus={true}
+          autoFocus={false} // Otomatik odaklanmayı kapat
         />
         {!hizliMod && (
           <TextInput
@@ -459,6 +473,22 @@ export default function SayimDetay({ route, navigation }) {
           />
         )}
       </View>
+
+      {/* Klavye açma butonu */}
+      {!klavyeOtomatikAcilsin && (
+        <TouchableOpacity
+          style={[
+            styles.addBtn,
+            { backgroundColor: "#6c757d", marginBottom: 10 },
+          ]}
+          onPress={klavyeyiAc}
+          activeOpacity={0.7}
+        >
+          <MaterialCommunityIcons name="keyboard" size={22} color="#fff" />
+          <Text style={styles.addText}>Klavyeyi Aç</Text>
+        </TouchableOpacity>
+      )}
+
       <TouchableOpacity
         style={styles.addBtn}
         onPress={urunEkle}

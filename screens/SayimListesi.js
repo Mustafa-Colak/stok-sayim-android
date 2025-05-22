@@ -23,6 +23,7 @@ export default function SayimListesi({ navigation, route }) {
   const [yukleniyor, setYukleniyor] = useState(true);
   const [yenileniyor, setYenileniyor] = useState(false);
   const [kalanGun, setKalanGun] = useState(0);
+  const [urunSayilari, setUrunSayilari] = useState({}); // Her sayım için ürün sayısını tutacak
 
   // Rapor oluşturma amacıyla mı açıldı?
   const isForReport = route.params?.purpose === "selectForReport";
@@ -30,9 +31,11 @@ export default function SayimListesi({ navigation, route }) {
   // Sayfa her odaklandığında sayımları yükle
   useFocusEffect(
     useCallback(() => {
+      // Her odaklanmada sayımları yükle
+      sayimlariYukle();
+
       // Route params'tan durum güncellemesi kontrolü
       if (route.params?.durumuGuncelle) {
-        sayimlariYukle();
         // Parametreyi temizle
         navigation.setParams({ durumuGuncelle: undefined });
       }
@@ -75,6 +78,9 @@ export default function SayimListesi({ navigation, route }) {
         // Sayımları tarihe göre sırala (en yeni en üstte)
         liste.sort((a, b) => new Date(b.tarih) - new Date(a.tarih));
         setSayimlar(liste);
+
+        // Her sayım için ürün sayılarını yükle
+        await urunSayilariniYukle(liste);
       } else {
         setSayimlar([]);
       }
@@ -84,6 +90,28 @@ export default function SayimListesi({ navigation, route }) {
     } finally {
       setYukleniyor(false);
       setYenileniyor(false);
+    }
+  };
+
+  // Her sayım için ürün sayılarını yükleme
+  const urunSayilariniYukle = async (sayimListesi) => {
+    try {
+      const sayilar = {};
+
+      // Her sayım için ürün sayısını al
+      for (const sayim of sayimListesi) {
+        const urunlerStr = await AsyncStorage.getItem(`sayim_${sayim.id}`);
+        if (urunlerStr) {
+          const urunler = JSON.parse(urunlerStr);
+          sayilar[sayim.id] = urunler.length;
+        } else {
+          sayilar[sayim.id] = 0;
+        }
+      }
+
+      setUrunSayilari(sayilar);
+    } catch (error) {
+      console.error("Ürün sayıları yükleme hatası:", error);
     }
   };
 
@@ -207,33 +235,52 @@ export default function SayimListesi({ navigation, route }) {
       style={styles.sayimItem}
       onPress={() => sayimSecildi(item)}
     >
-      <View style={styles.sayimContent}>
-        <Text style={styles.sayimNot} numberOfLines={1} ellipsizeMode="tail">
-          {item.not || "İsimsiz Sayım"}
-        </Text>
+      <View style={styles.sayimContentContainer}>
+        {/* Sol taraf - Sayım bilgileri */}
+        <View style={styles.sayimBilgileri}>
+          <Text
+            style={styles.sayimNot}
+            numberOfLines={2} // İki satıra kadar izin ver
+            ellipsizeMode="tail"
+          >
+            {item.not || "İsimsiz Sayım"}
+          </Text>
 
-        <View
-          style={styles.durumBadge}
-          backgroundColor={durumRenginiGetir(item.durum)}
-        >
-          <Text style={styles.durumText}>{durumMetniniGetir(item.durum)}</Text>
+          <Text style={styles.sayimMiktar}>
+            {urunSayilari[item.id] !== undefined
+              ? `${urunSayilari[item.id]} ürün`
+              : "Yükleniyor..."}
+          </Text>
+        </View>
+
+        {/* Sağ taraf - Durum ve silme butonu */}
+        <View style={styles.sayimActions}>
+          <View
+            style={[
+              styles.durumBadge,
+              { backgroundColor: durumRenginiGetir(item.durum) },
+            ]}
+          >
+            <Text style={styles.durumText}>
+              {durumMetniniGetir(item.durum)}
+            </Text>
+          </View>
+
+          {!isForReport && (
+            <TouchableOpacity
+              style={styles.silButon}
+              onPress={() => sayimSil(item.id, item.not)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <MaterialCommunityIcons
+                name="trash-can-outline"
+                size={22}
+                color="red"
+              />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
-
-      {/* Rapor oluşturma modunda silme butonu gösterme */}
-      {!isForReport && (
-        <TouchableOpacity
-          style={styles.silButon}
-          onPress={() => sayimSil(item.id, item.not)}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <MaterialCommunityIcons
-            name="trash-can-outline"
-            size={22}
-            color="red"
-          />
-        </TouchableOpacity>
-      )}
     </TouchableOpacity>
   );
 
@@ -310,25 +357,35 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 15,
     marginVertical: 5,
-    flexDirection: "row",
-    alignItems: "center",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.2,
     shadowRadius: 2,
     elevation: 2,
   },
-  sayimContent: {
-    flex: 1,
+  sayimContentContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
+  },
+  sayimBilgileri: {
+    flex: 1,
+    marginRight: 10,
   },
   sayimNot: {
     fontSize: 16,
     fontWeight: "500",
-    flex: 1,
-    marginRight: 10,
+    marginBottom: 4, // İsim ile miktar arasında boşluk
+    flexShrink: 1, // Metni sığdırmak için
+  },
+  sayimMiktar: {
+    fontSize: 12,
+    color: "#6c757d",
+    fontStyle: "italic",
+  },
+  sayimActions: {
+    flexDirection: "column",
+    justifyContent: "space-between",
+    alignItems: "flex-end",
   },
   durumBadge: {
     paddingHorizontal: 10,
@@ -336,6 +393,7 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     justifyContent: "center",
     alignItems: "center",
+    marginBottom: 8,
   },
   durumText: {
     color: "#fff",
@@ -343,7 +401,6 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
   silButon: {
-    marginLeft: 10,
     padding: 5,
   },
   separator: {
