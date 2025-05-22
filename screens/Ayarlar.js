@@ -1,236 +1,282 @@
+// e:\edev\stok-sayim\screens\Ayarlar.js
 import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
   StyleSheet,
+  Switch,
+  ScrollView,
   TouchableOpacity,
   TextInput,
   Alert,
-  ScrollView
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { lisansBilgisiYukle, tamSurumeYukselt, denemeSuresiniKontrolEt } from "../utils/LisansYonetimi";
-import common from "../styles/CommonStyles";
+import { useTema } from "../contexts/ThemeContext"; // ThemeContext'ten useTema hook'unu import ediyoruz
 
-export default function Ayarlar() {
-  const [lisansBilgisi, setLisansBilgisi] = useState(null);
-  const [lisansKodu, setLisansKodu] = useState("");
-  const [kalanGun, setKalanGun] = useState(0);
-  const [yukleniyor, setYukleniyor] = useState(true);
+export default function Ayarlar({ navigation }) {
+  // ThemeContext'ten tema bilgilerini al
+  const { tema, karanlikTema, temaDegistir } = useTema();
+  
+  // Özel alanlar
+  const [alanlar, setAlanlar] = useState([
+    { id: "alan1", isim: "Alan 1", aktif: false },
+    { id: "alan2", isim: "Alan 2", aktif: false },
+    { id: "alan3", isim: "Alan 3", aktif: false },
+    { id: "alan4", isim: "Alan 4", aktif: false },
+    { id: "alan5", isim: "Alan 5", aktif: false },
+  ]);
 
+  // Düzenleme modu
+  const [duzenlemeModu, setDuzenlemeModu] = useState(false);
+
+  // Ayarları yükle
   useEffect(() => {
-    const bilgileriYukle = async () => {
-      const lisans = await lisansBilgisiYukle();
-      setLisansBilgisi(lisans);
-      
-      const sureDurumu = await denemeSuresiniKontrolEt();
-      if (!sureDurumu.sureDoldu) {
-        setKalanGun(sureDurumu.kalanGun || 0);
-      }
-      
-      setYukleniyor(false);
-    };
-    
-    bilgileriYukle();
+    ozelAlanlariYukle();
   }, []);
 
-  const lisansKoduOnayla = async () => {
-    if (!lisansKodu.trim()) {
-      Alert.alert("Hata", "Lütfen bir lisans kodu girin.");
-      return;
-    }
-    
-    const sonuc = await tamSurumeYukselt(lisansKodu);
-    if (sonuc.basarili) {
-      Alert.alert("Başarılı", "Tam sürüme başarıyla yükseltildi. Tüm özellikler artık kullanılabilir.");
-      // Lisans bilgisini güncelle
-      const yeniLisans = await lisansBilgisiYukle();
-      setLisansBilgisi(yeniLisans);
-      setLisansKodu("");
-    } else {
-      Alert.alert("Hata", sonuc.mesaj || "Lisans kodu doğrulanamadı.");
+  // Özel alanları yükle
+  const ozelAlanlariYukle = async () => {
+    try {
+      // Özel alanları yükle
+      const kayitliAlanlar = await AsyncStorage.getItem("ozel_alanlar");
+      if (kayitliAlanlar !== null) {
+        setAlanlar(JSON.parse(kayitliAlanlar));
+      }
+    } catch (error) {
+      console.error("Özel alanlar yüklenirken hata oluştu:", error);
     }
   };
 
-  if (yukleniyor) {
-    return (
-      <View style={[common.container, { justifyContent: "center", alignItems: "center" }]}>
-        <Text>Yükleniyor...</Text>
-      </View>
+  // Tema değişikliğini kaydet - ThemeContext'in temaDegistir fonksiyonunu kullan
+  const temaAyariniDegistir = (deger) => {
+    temaDegistir(deger);
+    Alert.alert(
+      "Tema Değiştirildi",
+      "Tema ayarı kaydedildi.",
+      [{ text: "Tamam" }]
     );
-  }
+  };
+
+  // Alan durumunu değiştir
+  const alanDurumunuDegistir = async (id, deger) => {
+    const yeniAlanlar = alanlar.map((alan) =>
+      alan.id === id ? { ...alan, aktif: deger } : alan
+    );
+    setAlanlar(yeniAlanlar);
+
+    try {
+      await AsyncStorage.setItem("ozel_alanlar", JSON.stringify(yeniAlanlar));
+    } catch (error) {
+      console.error("Alan durumu kaydedilirken hata oluştu:", error);
+    }
+  };
+
+  // Alan ismini değiştir
+  const alanIsminiDegistir = (id, yeniIsim) => {
+    const yeniAlanlar = alanlar.map((alan) =>
+      alan.id === id ? { ...alan, isim: yeniIsim } : alan
+    );
+    setAlanlar(yeniAlanlar);
+  };
+
+  // Değişiklikleri kaydet
+  const degisiklikleriKaydet = async () => {
+    try {
+      await AsyncStorage.setItem("ozel_alanlar", JSON.stringify(alanlar));
+      setDuzenlemeModu(false);
+      Alert.alert("Başarılı", "Alan isimleri kaydedildi.");
+    } catch (error) {
+      console.error("Alan isimleri kaydedilirken hata oluştu:", error);
+      Alert.alert("Hata", "Alan isimleri kaydedilemedi.");
+    }
+  };
+
+  // Tema renklerini kullanarak dinamik stiller oluştur
+  const dinamikStiller = StyleSheet.create({
+    container: {
+      flex: 1,
+      padding: 16,
+      backgroundColor: tema.arkaplan,
+    },
+    baslik: {
+      fontSize: 24,
+      fontWeight: "bold",
+      marginBottom: 20,
+      color: tema.metin,
+    },
+    ayarKart: {
+      backgroundColor: tema.kart,
+      borderRadius: 12,
+      padding: 16,
+      marginBottom: 16,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: karanlikTema ? 0.3 : 0.1,
+      shadowRadius: 4,
+      elevation: 2,
+    },
+    ayarBaslik: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginBottom: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: tema.sinir,
+      paddingBottom: 8,
+    },
+    ayarBaslikText: {
+      fontSize: 18,
+      fontWeight: "600",
+      marginLeft: 8,
+      flex: 1,
+      color: tema.metin,
+    },
+    ayarSatir: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: tema.sinir,
+    },
+    ayarText: {
+      fontSize: 16,
+      color: tema.metin,
+    },
+    bilgiText: {
+      fontSize: 14,
+      color: tema.ikincilMetin,
+      fontStyle: "italic",
+      marginBottom: 12,
+    },
+    alanInput: {
+      flex: 1,
+      borderWidth: 1,
+      borderColor: tema.girdiBorder,
+      borderRadius: 4,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      marginRight: 12,
+      fontSize: 16,
+      color: tema.metin,
+      backgroundColor: tema.girdi,
+    },
+  });
 
   return (
-    <ScrollView style={common.container}>
-      <Text style={common.title}>Ayarlar</Text>
-      
-      {/* Lisans Bilgisi */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Lisans Bilgisi</Text>
-        <View style={styles.lisansKutusu}>
-          <Text style={styles.lisansBaslik}>
-            Mevcut Lisans: 
-            <Text style={[
-              styles.lisansTipi, 
-              {color: lisansBilgisi?.tip === "ucretli" ? "#28a745" : "#dc3545"}
-            ]}>
-              {" "}{lisansBilgisi?.tip === "ucretli" ? "TAM SÜRÜM" : "ÜCRETSİZ SÜRÜM"}
-            </Text>
-          </Text>
-          
-          {lisansBilgisi?.tip !== "ucretli" && (
-            <>
-              <Text style={styles.kalanGun}>
-                Deneme sürenizin bitmesine {kalanGun} gün kaldı.
-              </Text>
-              
-              <Text style={styles.limitBilgisi}>
-                Ücretsiz sürüm limitleri:
-              </Text>
-              <Text style={styles.limitDetay}>• Maksimum 3 aktif sayım</Text>
-              <Text style={styles.limitDetay}>• Her sayımda maksimum 50 ürün</Text>
-              <Text style={styles.limitDetay}>• 30 günlük deneme süresi</Text>
-              
-              <View style={styles.lisansGirisKutusu}>
-                <TextInput
-                  value={lisansKodu}
-                  onChangeText={setLisansKodu}
-                  placeholder="Lisans kodunu girin"
-                  style={styles.lisansInput}
-                />
-                <TouchableOpacity 
-                  style={styles.lisansBtn}
-                  onPress={lisansKoduOnayla}
-                >
-                  <Text style={styles.lisansBtnText}>Etkinleştir</Text>
-                </TouchableOpacity>
-              </View>
-              
-              <TouchableOpacity 
-                style={styles.satinAlBtn}
-                onPress={() => Alert.alert(
-                  "Satın Alma", 
-                  "Gerçek bir uygulamada burada satın alma sayfasına yönlendirme yapılır."
-                )}
-              >
-                <MaterialCommunityIcons name="cart-outline" size={20} color="#fff" />
-                <Text style={styles.satinAlBtnText}>Tam Sürümü Satın Al</Text>
-              </TouchableOpacity>
-            </>
-          )}
-          
-          {lisansBilgisi?.tip === "ucretli" && (
-            <Text style={styles.tesekkur}>
-              Tam sürümü satın aldığınız için teşekkür ederiz! Tüm özelliklere sınırsız erişiminiz var.
-            </Text>
-          )}
+    <ScrollView style={dinamikStiller.container}>
+      {/* Tema Ayarı */}
+      <View style={dinamikStiller.ayarKart}>
+        <View style={dinamikStiller.ayarBaslik}>
+          <MaterialCommunityIcons
+            name="theme-light-dark"
+            size={24}
+            color={tema.vurgu}
+          />
+          <Text style={dinamikStiller.ayarBaslikText}>Tema Ayarları</Text>
+        </View>
+
+        <View style={dinamikStiller.ayarSatir}>
+          <Text style={dinamikStiller.ayarText}>Karanlık Tema</Text>
+          <Switch
+            value={karanlikTema}
+            onValueChange={temaAyariniDegistir}
+            trackColor={{ false: "#767577", true: "#81b0ff" }}
+            thumbColor={karanlikTema ? "#007bff" : "#f4f3f4"}
+          />
         </View>
       </View>
-      
-      {/* Diğer ayarlar buraya eklenebilir */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Uygulama Hakkında</Text>
-        <Text style={styles.versiyon}>Versiyon: 1.0.0</Text>
-        <Text style={styles.telif}>© 2025 Stok Sayım Uygulaması</Text>
+
+      {/* Özel Alanlar */}
+      <View style={dinamikStiller.ayarKart}>
+        <View style={dinamikStiller.ayarBaslik}>
+          <MaterialCommunityIcons
+            name="form-textbox"
+            size={24}
+            color={tema.vurgu}
+          />
+          <Text style={dinamikStiller.ayarBaslikText}>Özel Alanlar</Text>
+
+          <TouchableOpacity
+            style={[styles.duzenleButon, { backgroundColor: tema.vurgu }]}
+            onPress={() => {
+              if (duzenlemeModu) {
+                degisiklikleriKaydet();
+              } else {
+                setDuzenlemeModu(true);
+              }
+            }}
+          >
+            <Text style={styles.duzenleButonText}>
+              {duzenlemeModu ? "Kaydet" : "Düzenle"}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        <Text style={dinamikStiller.bilgiText}>
+          Aktif edilen alanlar sayım detayında görünür. Alanlar aktif
+          edildiğinde hızlı sayım modu pasif olur.
+        </Text>
+
+        {alanlar.map((alan) => (
+          <View key={alan.id} style={dinamikStiller.ayarSatir}>
+            {duzenlemeModu ? (
+              <TextInput
+                style={dinamikStiller.alanInput}
+                value={alan.isim}
+                onChangeText={(text) => alanIsminiDegistir(alan.id, text)}
+                placeholder="Alan adını girin"
+                placeholderTextColor={tema.ikincilMetin}
+              />
+            ) : (
+              <Text style={dinamikStiller.ayarText}>{alan.isim}</Text>
+            )}
+            <Switch
+              value={alan.aktif}
+              onValueChange={(deger) => alanDurumunuDegistir(alan.id, deger)}
+              trackColor={{ false: "#767577", true: "#81b0ff" }}
+              thumbColor={alan.aktif ? "#007bff" : "#f4f3f4"}
+            />
+          </View>
+        ))}
+      </View>
+
+      {/* Lisans Bilgileri */}
+      <View style={dinamikStiller.ayarKart}>
+        <View style={dinamikStiller.ayarBaslik}>
+          <MaterialCommunityIcons name="license" size={24} color={tema.vurgu} />
+          <Text style={dinamikStiller.ayarBaslikText}>Lisans Bilgileri</Text>
+        </View>
+
+        <TouchableOpacity style={styles.lisansButon}>
+          <Text style={styles.lisansButonText}>Tam Sürüme Geç</Text>
+        </TouchableOpacity>
       </View>
     </ScrollView>
   );
 }
 
+// Sabit stiller
 const styles = StyleSheet.create({
-  section: {
-    marginBottom: 20,
-    padding: 15,
-    backgroundColor: "#fff",
-    borderRadius: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 10,
-    color: "#333",
-  },
-  lisansKutusu: {
-    padding: 15,
-    backgroundColor: "#f8f9fa",
-    borderRadius: 6,
-  },
-  lisansBaslik: {
-    fontSize: 16,
-    fontWeight: "bold",
-    marginBottom: 10,
-  },
-  lisansTipi: {
-    fontWeight: "bold",
-  },
-  kalanGun: {
-    fontSize: 14,
-    marginBottom: 15,
-    color: "#dc3545",
-  },
-  limitBilgisi: {
-    fontSize: 14,
-    fontWeight: "bold",
-    marginBottom: 5,
-  },
-  limitDetay: {
-    fontSize: 14,
-    marginBottom: 3,
-    marginLeft: 5,
-  },
-  lisansGirisKutusu: {
-    flexDirection: "row",
-    marginTop: 15,
-    marginBottom: 15,
-  },
-  lisansInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: "#ced4da",
-    borderRadius: 4,
-    padding: 8,
-    marginRight: 10,
-  },
-  lisansBtn: {
-    backgroundColor: "#007bff",
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    borderRadius: 4,
-    justifyContent: "center",
-  },
-  lisansBtnText: {
-    color: "#fff",
-    fontWeight: "bold",
-  },
-  satinAlBtn: {
-    backgroundColor: "#28a745",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 12,
+  duzenleButon: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 4,
   },
-  satinAlBtnText: {
-    color: "#fff",
-    fontWeight: "bold",
-    marginLeft: 8,
-  },
-  tesekkur: {
-    fontSize: 14,
-    color: "#28a745",
+  duzenleButonText: {
+    color: "white",
     fontWeight: "500",
   },
-  versiyon: {
-    fontSize: 14,
-    marginBottom: 5,
+  lisansButon: {
+    backgroundColor: "#007bff",
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 8,
   },
-  telif: {
-    fontSize: 12,
-    color: "#6c757d",
+  lisansButonText: {
+    color: "white",
+    fontWeight: "bold",
+    fontSize: 16,
   },
 });

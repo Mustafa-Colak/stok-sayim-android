@@ -13,12 +13,14 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import common from "../styles/CommonStyles";
+import { useTema } from "../contexts/ThemeContext"; // ThemeContext'i import et
 import {
   sayimSayisiLimitiniKontrolEt,
   denemeSuresiniKontrolEt,
 } from "../utils/LisansYonetimi";
 
 export default function SayimListesi({ navigation, route }) {
+  const { tema, karanlikTema } = useTema(); // ThemeContext'ten tema bilgilerini al
   const [sayimlar, setSayimlar] = useState([]);
   const [yukleniyor, setYukleniyor] = useState(true);
   const [yenileniyor, setYenileniyor] = useState(false);
@@ -229,24 +231,152 @@ export default function SayimListesi({ navigation, route }) {
     }
   };
 
-  // Sayım öğesi render fonksiyonu - Tamamen yeniden düzenlendi
+  // Tema renklerini kullanarak dinamik stiller oluştur
+  const dinamikStiller = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: tema.arkaplan,
+    },
+    title: {
+      fontSize: 24,
+      fontWeight: "bold",
+      marginVertical: 16,
+      marginHorizontal: 16,
+      color: tema.metin,
+    },
+    subtitle: {
+      fontSize: 16,
+      color: tema.ikincilMetin,
+      textAlign: "center",
+      marginTop: 20,
+    },
+    listContainer: {
+      paddingHorizontal: 10,
+      paddingBottom: 80, // FAB için alan bırak
+    },
+    emptyList: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    sayimItem: {
+      backgroundColor: tema.kart,
+      borderRadius: 8,
+      padding: 15,
+      marginVertical: 5,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: karanlikTema ? 0.3 : 0.2,
+      shadowRadius: 2,
+      elevation: 2,
+    },
+    sayimContentContainer: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+    },
+    sayimBilgileri: {
+      flex: 1,
+      marginRight: 10,
+    },
+    sayimNot: {
+      fontSize: 16,
+      fontWeight: "500",
+      marginBottom: 4,
+      flexShrink: 1,
+      color: tema.metin,
+    },
+    sayimMiktar: {
+      fontSize: 12,
+      color: tema.ikincilMetin,
+      fontStyle: "italic",
+    },
+    sayimActions: {
+      flexDirection: "column",
+      justifyContent: "space-between",
+      alignItems: "flex-end",
+    },
+    durumBadge: {
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 15,
+      justifyContent: "center",
+      alignItems: "center",
+      marginBottom: 8,
+    },
+    durumText: {
+      color: "#fff",
+      fontSize: 12,
+      fontWeight: "bold",
+    },
+    silButon: {
+      padding: 5,
+    },
+    separator: {
+      height: 1,
+      backgroundColor: tema.sinir,
+    },
+    uyariKutusu: {
+      backgroundColor: karanlikTema ? "#332700" : "#fff3cd",
+      borderColor: karanlikTema ? "#665200" : "#ffeeba",
+      borderWidth: 1,
+      borderRadius: 8,
+      padding: 15,
+      marginHorizontal: 10,
+      marginBottom: 15,
+    },
+    uyariMetni: {
+      color: karanlikTema ? "#ffda6a" : "#856404",
+      fontSize: 14,
+      marginBottom: 10,
+    },
+    tamSurumeGecBtn: {
+      backgroundColor: tema.buton,
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+      borderRadius: 4,
+      alignSelf: "flex-end",
+    },
+    tamSurumeGecBtnText: {
+      color: tema.butonMetin,
+      fontSize: 12,
+      fontWeight: "bold",
+    },
+    fabButton: {
+      position: "absolute",
+      bottom: 20,
+      right: 20,
+      backgroundColor: tema.buton,
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      justifyContent: "center",
+      alignItems: "center",
+      elevation: 5,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 3.84,
+    },
+  });
+
+  // Sayım öğesi render fonksiyonu
   const renderSayimItem = ({ item }) => (
     <TouchableOpacity
-      style={styles.sayimItem}
+      style={dinamikStiller.sayimItem}
       onPress={() => sayimSecildi(item)}
     >
-      <View style={styles.sayimContentContainer}>
+      <View style={dinamikStiller.sayimContentContainer}>
         {/* Sol taraf - Sayım bilgileri */}
-        <View style={styles.sayimBilgileri}>
+        <View style={dinamikStiller.sayimBilgileri}>
           <Text
-            style={styles.sayimNot}
-            numberOfLines={2} // İki satıra kadar izin ver
+            style={dinamikStiller.sayimNot}
+            numberOfLines={2}
             ellipsizeMode="tail"
           >
             {item.not || "İsimsiz Sayım"}
           </Text>
 
-          <Text style={styles.sayimMiktar}>
+          <Text style={dinamikStiller.sayimMiktar}>
             {urunSayilari[item.id] !== undefined
               ? `${urunSayilari[item.id]} ürün`
               : "Yükleniyor..."}
@@ -254,21 +384,21 @@ export default function SayimListesi({ navigation, route }) {
         </View>
 
         {/* Sağ taraf - Durum ve silme butonu */}
-        <View style={styles.sayimActions}>
+        <View style={dinamikStiller.sayimActions}>
           <View
             style={[
-              styles.durumBadge,
+              dinamikStiller.durumBadge,
               { backgroundColor: durumRenginiGetir(item.durum) },
             ]}
           >
-            <Text style={styles.durumText}>
+            <Text style={dinamikStiller.durumText}>
               {durumMetniniGetir(item.durum)}
             </Text>
           </View>
 
           {!isForReport && (
             <TouchableOpacity
-              style={styles.silButon}
+              style={dinamikStiller.silButon}
               onPress={() => sayimSil(item.id, item.not)}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
@@ -285,23 +415,25 @@ export default function SayimListesi({ navigation, route }) {
   );
 
   return (
-    <View style={common.container}>
-      <Text style={common.title}>
+    <View style={dinamikStiller.container}>
+      <Text style={dinamikStiller.title}>
         {isForReport ? "Rapor İçin Sayım Seçin" : "Sayım Seçin"}
       </Text>
 
       {/* Kalan gün uyarısı */}
       {kalanGun > 0 && kalanGun <= 5 && (
-        <View style={styles.uyariKutusu}>
-          <Text style={styles.uyariMetni}>
+        <View style={dinamikStiller.uyariKutusu}>
+          <Text style={dinamikStiller.uyariMetni}>
             Deneme sürenizin bitmesine {kalanGun} gün kaldı. Tam sürüme geçmeyi
             düşünün.
           </Text>
           <TouchableOpacity
-            style={styles.tamSurumeGecBtn}
+            style={dinamikStiller.tamSurumeGecBtn}
             onPress={() => navigation.navigate("Ayarlar")}
           >
-            <Text style={styles.tamSurumeGecBtnText}>Tam Sürüme Geç</Text>
+            <Text style={dinamikStiller.tamSurumeGecBtnText}>
+              Tam Sürüme Geç
+            </Text>
           </TouchableOpacity>
         </View>
       )}
@@ -311,126 +443,41 @@ export default function SayimListesi({ navigation, route }) {
         keyExtractor={(item) => item.id}
         renderItem={renderSayimItem}
         refreshControl={
-          <RefreshControl refreshing={yenileniyor} onRefresh={yenile} />
+          <RefreshControl
+            refreshing={yenileniyor}
+            onRefresh={yenile}
+            tintColor={tema.vurgu} // Yenileme indikatörünün rengi
+            colors={[tema.vurgu]} // Android için renk
+          />
         }
         ListEmptyComponent={
           yukleniyor ? (
-            <Text style={common.subtitle}>Yükleniyor...</Text>
+            <Text style={dinamikStiller.subtitle}>Yükleniyor...</Text>
           ) : (
-            <Text style={common.subtitle}>Henüz sayım bulunmuyor.</Text>
+            <Text style={dinamikStiller.subtitle}>Henüz sayım bulunmuyor.</Text>
           )
         }
         contentContainerStyle={[
-          sayimlar.length === 0 && styles.emptyList,
-          styles.listContainer,
+          sayimlar.length === 0 && dinamikStiller.emptyList,
+          dinamikStiller.listContainer,
         ]}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
+        ItemSeparatorComponent={() => <View style={dinamikStiller.separator} />}
       />
 
       {/* Rapor oluşturma modunda yeni sayım butonu gösterme */}
       {!isForReport && (
         <TouchableOpacity
-          style={common.fabButton}
+          style={dinamikStiller.fabButton}
           onPress={yeniSayimOlustur}
           activeOpacity={0.7}
         >
-          <MaterialCommunityIcons name="plus" size={24} color="#fff" />
+          <MaterialCommunityIcons
+            name="plus"
+            size={24}
+            color={tema.butonMetin}
+          />
         </TouchableOpacity>
       )}
     </View>
   );
 }
-
-// Stiller doğrudan bu dosyada tanımlandı
-const styles = StyleSheet.create({
-  listContainer: {
-    paddingHorizontal: 10,
-    paddingBottom: 80, // FAB için alan bırak
-  },
-  emptyList: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  sayimItem: {
-    backgroundColor: "#fff",
-    borderRadius: 8,
-    padding: 15,
-    marginVertical: 5,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  sayimContentContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  sayimBilgileri: {
-    flex: 1,
-    marginRight: 10,
-  },
-  sayimNot: {
-    fontSize: 16,
-    fontWeight: "500",
-    marginBottom: 4, // İsim ile miktar arasında boşluk
-    flexShrink: 1, // Metni sığdırmak için
-  },
-  sayimMiktar: {
-    fontSize: 12,
-    color: "#6c757d",
-    fontStyle: "italic",
-  },
-  sayimActions: {
-    flexDirection: "column",
-    justifyContent: "space-between",
-    alignItems: "flex-end",
-  },
-  durumBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 15,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-  durumText: {
-    color: "#fff",
-    fontSize: 12,
-    fontWeight: "bold",
-  },
-  silButon: {
-    padding: 5,
-  },
-  separator: {
-    height: 1,
-    backgroundColor: "#f0f0f0",
-  },
-  uyariKutusu: {
-    backgroundColor: "#fff3cd",
-    borderColor: "#ffeeba",
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 15,
-    marginHorizontal: 10,
-    marginBottom: 15,
-  },
-  uyariMetni: {
-    color: "#856404",
-    fontSize: 14,
-    marginBottom: 10,
-  },
-  tamSurumeGecBtn: {
-    backgroundColor: "#007bff",
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 4,
-    alignSelf: "flex-end",
-  },
-  tamSurumeGecBtnText: {
-    color: "#fff",
-    fontSize: 12,
-    fontWeight: "bold",
-  },
-});

@@ -4,6 +4,7 @@ import { NavigationContainer } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { View, Text, Image, StyleSheet, TouchableOpacity } from "react-native";
+import { ThemeProvider, useTema } from "./contexts/ThemeContext";
 
 import GirisEkrani from "./screens/GirisEkrani";
 import AnaMenu from "./screens/AnaMenu";
@@ -11,6 +12,7 @@ import SayimListesi from "./screens/SayimListesi";
 import SayimDetay from "./screens/SayimDetay";
 import RaporOlustur from "./screens/RaporOlustur";
 import YeniSayim from "./screens/YeniSayim";
+import Ayarlar from "./screens/Ayarlar"; // Yeni Ayarlar ekranını import et
 
 const Stack = createStackNavigator();
 
@@ -26,21 +28,26 @@ const CustomBackButton = ({ onPress }) => (
   </TouchableOpacity>
 );
 
-export default function App() {
+// Ana uygulama bileşeni
+const MainApp = () => {
+  const { tema } = useTema();
+
   return (
     <NavigationContainer>
       <Stack.Navigator
         screenOptions={({ navigation }) => ({
-          headerStyle: { backgroundColor: "#00a0b0" }, // UstaHesap turkuaz rengi
+          headerStyle: { backgroundColor: tema.vurgu }, // Tema rengini kullan
           headerTintColor: "#fff",
           headerTitleStyle: {
             fontWeight: "bold",
-            fontSize: 22, // Font boyutunu 22 olarak değiştirdim (önceki değer 18 idi)
+            fontSize: 22,
           },
           headerTitleAlign: "center", // Başlık yazısı ortada
           headerLeft: () => <UstaHesapLogo />, // Logo her zaman solda
           // Varsayılan geri butonunu kaldırıyoruz
           headerBackVisible: false,
+          // Tema renklerini ekranlara geçir
+          cardStyle: { backgroundColor: tema.arkaplan },
         })}
       >
         <Stack.Screen
@@ -108,8 +115,29 @@ export default function App() {
             ),
           })}
         />
+
+        <Stack.Screen
+          name="Ayarlar"
+          component={Ayarlar}
+          options={({ navigation }) => ({
+            title: "Ayarlar",
+            // Geri butonu sağda
+            headerRight: () => (
+              <CustomBackButton onPress={() => navigation.goBack()} />
+            ),
+          })}
+        />
       </Stack.Navigator>
     </NavigationContainer>
+  );
+};
+
+// Ana uygulama
+export default function App() {
+  return (
+    <ThemeProvider>
+      <MainApp />
+    </ThemeProvider>
   );
 }
 

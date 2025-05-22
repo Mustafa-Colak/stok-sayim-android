@@ -16,6 +16,7 @@ import {
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useTema } from "../contexts/ThemeContext"; // ThemeContext'i import et
 import common from "../styles/CommonStyles";
 import styles from "../styles/SayimDetayStyles";
 import {
@@ -24,9 +25,9 @@ import {
 } from "../utils/LisansYonetimi";
 
 // Performans için memoize edilmiş bileşen
-const UrunSatiri = React.memo(({ item, onSil }) => (
-  <View style={styles.row}>
-    <Text style={styles.text}>
+const UrunSatiri = React.memo(({ item, onSil, tema }) => (
+  <View style={[styles.row, { backgroundColor: tema.kart }]}>
+    <Text style={[styles.text, { color: tema.metin }]}>
       {item.barkod} - {item.miktar} {item.not ? `(${item.not})` : ""}
     </Text>
     <TouchableOpacity onPress={() => onSil(item.id)}>
@@ -36,6 +37,7 @@ const UrunSatiri = React.memo(({ item, onSil }) => (
 ));
 
 export default function SayimDetay({ route, navigation }) {
+  const { tema, karanlikTema } = useTema(); // ThemeContext'ten tema bilgilerini al
   const { sayimId, sayimNot } = route.params;
   const [urunler, setUrunler] = useState([]);
   const [gosterilecekUrunler, setGosterilecekUrunler] = useState([]); // Sadece gösterim için
@@ -47,6 +49,11 @@ export default function SayimDetay({ route, navigation }) {
   const [yukleniyor, setYukleniyor] = useState(true);
   const [kalanGun, setKalanGun] = useState(0);
   const [klavyeOtomatikAcilsin, setKlavyeOtomatikAcilsin] = useState(false); // Klavye kontrolü için yeni state
+
+  // Özel alanlar için state
+  const [ozelAlanlar, setOzelAlanlar] = useState([]);
+  const [alanDegerleri, setAlanDegerleri] = useState({});
+  const [aktifAlanVarMi, setAktifAlanVarMi] = useState(false);
 
   // Barkod input referansı
   const barkodInputRef = useRef(null);
@@ -65,6 +72,7 @@ export default function SayimDetay({ route, navigation }) {
       durumuYukle();
       modTercihiniYukle();
       lisansDurumunuKontrolEt();
+      ozelAlanlariYukle();
 
       // Veriler yüklendikten 1 saniye sonra klavye kontrolünü aktif et
       setTimeout(() => {
@@ -95,6 +103,65 @@ export default function SayimDetay({ route, navigation }) {
       }
     };
   }, [sayimId]);
+
+  // Özel alanları yükle
+  const ozelAlanlariYukle = async () => {
+    try {
+      // Özel alanları yükle
+      const alanlarJson = await AsyncStorage.getItem("ozel_alanlar");
+      if (alanlarJson) {
+        const alanlar = JSON.parse(alanlarJson);
+        setOzelAlanlar(alanlar);
+
+        // Aktif olan alanlar var mı kontrol et
+        const aktifAlanlar = alanlar.filter((alan) => alan.aktif);
+        setAktifAlanVarMi(aktifAlanlar.length > 0);
+
+        // Aktif alan varsa hızlı modu kapat
+        if (aktifAlanlar.length > 0) {
+          setHizliMod(false);
+        }
+
+        // Bu sayıma ait alan değerlerini yükle
+        const alanDegerleriJson = await AsyncStorage.getItem(
+          `sayim_alanlar_${sayimId}`
+        );
+        if (alanDegerleriJson) {
+          setAlanDegerleri(JSON.parse(alanDegerleriJson));
+        } else {
+          // Varsayılan boş değerler oluştur
+          const yeniDegerler = {};
+          alanlar.forEach((alan) => {
+            if (alan.aktif) {
+              yeniDegerler[alan.id] = "";
+            }
+          });
+          setAlanDegerleri(yeniDegerler);
+        }
+      }
+    } catch (error) {
+      console.error("Özel alanları yükleme hatası:", error);
+    }
+  };
+
+  // Alan değerlerini kaydet
+  const alanDegerleriniKaydet = async (yeniDegerler) => {
+    try {
+      await AsyncStorage.setItem(
+        `sayim_alanlar_${sayimId}`,
+        JSON.stringify(yeniDegerler)
+      );
+    } catch (error) {
+      console.error("Alan değerleri kaydetme hatası:", error);
+    }
+  };
+
+  // Alan değerini değiştir
+  const alanDegeriniDegistir = (alanId, deger) => {
+    const yeniDegerler = { ...alanDegerleri, [alanId]: deger };
+    setAlanDegerleri(yeniDegerler);
+    alanDegerleriniKaydet(yeniDegerler);
+  };
 
   // Barkod alanına odaklanma - Otomatik odaklanmayı kontrol ediyoruz
   useEffect(() => {
@@ -131,6 +198,16 @@ export default function SayimDetay({ route, navigation }) {
   };
 
   const modTercihiniKaydet = (deger) => {
+    // Aktif alan varsa hızlı mod seçilemez
+    if (deger && aktifAlanVarMi) {
+      Alert.alert(
+        "Uyarı",
+        "Aktif özel alanlar varken hızlı mod kullanılamaz. Özel alanları kapatın veya ayarlardan devre dışı bırakın.",
+        [{ text: "Tamam" }]
+      );
+      return;
+    }
+
     setHizliMod(deger);
 
     // Mod değişikliğinde miktar alanına varsayılan değer atama
@@ -251,6 +328,25 @@ export default function SayimDetay({ route, navigation }) {
       return;
     }
 
+    // Özel alanların dolu olup olmadığını kontrol et
+    const eksikAlanlar = [];
+    ozelAlanlar.forEach((alan) => {
+      if (
+        alan.aktif &&
+        (!alanDegerleri[alan.id] || alanDegerleri[alan.id].trim() === "")
+      ) {
+        eksikAlanlar.push(alan.isim);
+      }
+    });
+
+    if (eksikAlanlar.length > 0) {
+      Alert.alert(
+        "Uyarı",
+        `Lütfen şu alanları doldurun: ${eksikAlanlar.join(", ")}`
+      );
+      return;
+    }
+
     // Yeni ürün oluştur
     const yeni = {
       id: Date.now().toString(),
@@ -258,6 +354,8 @@ export default function SayimDetay({ route, navigation }) {
       miktar: hizliMod ? 1 : parseInt(miktar) || 1,
       not: hizliMod ? "" : not.trim(), // Hızlı modda not alanını boş bırak
       ad: "", // Ürün adı (notu) şu an girilmediği için boş bırakıyoruz, raporlama için eklendi
+      // Özel alanları ekle
+      ozelAlanlar: { ...alanDegerleri },
     };
 
     // Önce ref'i güncelle
@@ -390,60 +488,214 @@ export default function SayimDetay({ route, navigation }) {
     }
   };
 
+  // Tema renklerini kullanarak dinamik stiller oluştur
+  const dinamikStiller = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: tema.arkaplan,
+      padding: 16,
+    },
+    title: {
+      fontSize: 24,
+      fontWeight: "bold",
+      marginBottom: 10,
+      color: tema.metin,
+    },
+    subtitle: {
+      fontSize: 16,
+      color: tema.ikincilMetin,
+      textAlign: "center",
+      marginTop: 20,
+    },
+    modeContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 10,
+      paddingHorizontal: 5,
+      paddingVertical: 8,
+      backgroundColor: tema.kart,
+      borderRadius: 4,
+    },
+    modeText: {
+      fontSize: 16,
+      color: tema.metin,
+    },
+    inputContainer: {
+      marginBottom: 10,
+    },
+    input: {
+      borderWidth: 1,
+      borderColor: tema.girdiBorder,
+      backgroundColor: tema.girdi,
+      color: tema.metin,
+      borderRadius: 4,
+      padding: 10,
+      marginBottom: 8,
+      fontSize: 16,
+    },
+    addBtn: {
+      backgroundColor: tema.buton,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 12,
+      borderRadius: 4,
+      marginBottom: 10,
+    },
+    addText: {
+      color: tema.butonMetin,
+      fontSize: 16,
+      fontWeight: "bold",
+      marginLeft: 8,
+    },
+    countContainer: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginVertical: 5,
+    },
+    countText: {
+      fontSize: 14,
+      fontWeight: "bold",
+      color: tema.metin,
+    },
+    row: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      padding: 10,
+      backgroundColor: tema.kart,
+      borderRadius: 4,
+      marginBottom: 5,
+    },
+    text: {
+      flex: 1,
+      fontSize: 16,
+      color: tema.metin,
+    },
+    separator: {
+      height: 1,
+      backgroundColor: tema.sinir,
+    },
+    uyariKutusu: {
+      backgroundColor: karanlikTema ? "#332700" : "#fff3cd",
+      borderColor: karanlikTema ? "#665200" : "#ffeeba",
+      borderWidth: 1,
+      borderRadius: 8,
+      padding: 10,
+      marginBottom: 10,
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+    },
+    uyariMetni: {
+      color: karanlikTema ? "#ffda6a" : "#856404",
+      fontSize: 12,
+      flex: 1,
+    },
+    tamSurumeGecBtn: {
+      backgroundColor: tema.buton,
+      paddingVertical: 6,
+      paddingHorizontal: 10,
+      borderRadius: 4,
+      marginLeft: 10,
+    },
+    tamSurumeGecBtnText: {
+      color: tema.butonMetin,
+      fontSize: 10,
+      fontWeight: "bold",
+    },
+    limitBilgisi: {
+      fontSize: 12,
+      color: (urunler.length >= 45) ? "#dc3545" : tema.ikincilMetin,
+      fontWeight: (urunler.length >= 45) ? "bold" : "normal",
+    },
+    sonlandirBtn: {
+      backgroundColor: karanlikTema ? "#6c757d" : "gray",
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 12,
+      borderRadius: 4,
+      marginTop: 10,
+    },
+    devamEtBtn: {
+      backgroundColor: karanlikTema ? "#1e7e34" : "#28a745",
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 12,
+      borderRadius: 4,
+      marginTop: 10,
+    },
+    klavyeAcBtn: {
+      backgroundColor: karanlikTema ? "#5a6268" : "#6c757d",
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 12,
+      borderRadius: 4,
+      marginBottom: 10,
+    }
+  });
+
   // Yükleniyor durumu
   if (yukleniyor) {
     return (
       <View
         style={[
-          common.container,
+          dinamikStiller.container,
           { justifyContent: "center", alignItems: "center" },
         ]}
       >
-        <Text>Yükleniyor...</Text>
+        <Text style={{ color: tema.metin }}>Yükleniyor...</Text>
       </View>
     );
   }
 
   return (
     <KeyboardAvoidingView
-      style={common.container}
+      style={dinamikStiller.container}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <Text style={common.title}>{sayimNot}</Text>
+      <Text style={dinamikStiller.title}>{sayimNot}</Text>
 
       {/* Kalan gün uyarısı */}
       {kalanGun > 0 && kalanGun <= 5 && (
-        <View style={extraStyles.uyariKutusu}>
-          <Text style={extraStyles.uyariMetni}>
+        <View style={dinamikStiller.uyariKutusu}>
+          <Text style={dinamikStiller.uyariMetni}>
             Deneme sürenizin bitmesine {kalanGun} gün kaldı.
           </Text>
           <TouchableOpacity
-            style={extraStyles.tamSurumeGecBtn}
+            style={dinamikStiller.tamSurumeGecBtn}
             onPress={() => navigation.navigate("Ayarlar")}
           >
-            <Text style={extraStyles.tamSurumeGecBtnText}>Tam Sürüme Geç</Text>
+            <Text style={dinamikStiller.tamSurumeGecBtnText}>Tam Sürüme Geç</Text>
           </TouchableOpacity>
         </View>
       )}
 
-      <View style={styles.modeContainer}>
-        <Text style={styles.modeText}>Hızlı Sayım Modu:</Text>
+      <View style={dinamikStiller.modeContainer}>
+        <Text style={dinamikStiller.modeText}>Hızlı Sayım Modu:</Text>
         <Switch
           value={hizliMod}
           onValueChange={modTercihiniKaydet}
-          trackColor={{ false: "#767577", true: "#81b0ff" }}
-          thumbColor={hizliMod ? "#007bff" : "#f4f3f4"}
+          trackColor={{ false: karanlikTema ? "#555" : "#767577", true: karanlikTema ? "#3a6ea5" : "#81b0ff" }}
+          thumbColor={hizliMod ? tema.buton : karanlikTema ? "#f4f3f4" : "#f4f3f4"}
+          disabled={aktifAlanVarMi} // Aktif alan varsa hızlı mod seçilemez
         />
       </View>
 
       {/* Veri giriş alanları */}
-      <View style={styles.inputContainer}>
+      <View style={dinamikStiller.inputContainer}>
         <TextInput
           ref={barkodInputRef}
           value={barkod}
           onChangeText={setBarkod}
           placeholder="Barkod"
-          style={styles.input}
+          placeholderTextColor={tema.ikincilMetin}
+          style={dinamikStiller.input}
           onSubmitEditing={barkodGirisiniTamamla}
           returnKeyType={hizliMod ? "done" : "next"}
           blurOnSubmit={false}
@@ -454,8 +706,9 @@ export default function SayimDetay({ route, navigation }) {
             value={miktar}
             onChangeText={setMiktar}
             placeholder="Miktar"
+            placeholderTextColor={tema.ikincilMetin}
             keyboardType="numeric"
-            style={styles.input}
+            style={dinamikStiller.input}
             returnKeyType="next"
             blurOnSubmit={false}
           />
@@ -466,50 +719,73 @@ export default function SayimDetay({ route, navigation }) {
             value={not}
             onChangeText={setNot}
             placeholder="Not (opsiyonel)"
-            style={styles.input}
-            onSubmitEditing={urunEkle}
-            returnKeyType="done"
+            placeholderTextColor={tema.ikincilMetin}
+            style={dinamikStiller.input}
+            returnKeyType={aktifAlanVarMi ? "next" : "done"}
             blurOnSubmit={false}
           />
         )}
+
+        {/* Özel alanlar */}
+        {ozelAlanlar.map((alan) => {
+          if (alan.aktif) {
+            return (
+              <TextInput
+                key={alan.id}
+                value={alanDegerleri[alan.id] || ""}
+                onChangeText={(text) => alanDegeriniDegistir(alan.id, text)}
+                placeholder={alan.isim}
+                placeholderTextColor={tema.ikincilMetin}
+                style={dinamikStiller.input}
+                returnKeyType={
+                  alan.id === ozelAlanlar[ozelAlanlar.length - 1].id
+                    ? "done"
+                    : "next"
+                }
+                blurOnSubmit={false}
+              />
+            );
+          }
+          return null;
+        })}
       </View>
 
       {/* Klavye açma butonu */}
       {!klavyeOtomatikAcilsin && (
         <TouchableOpacity
-          style={[
-            styles.addBtn,
-            { backgroundColor: "#6c757d", marginBottom: 10 },
-          ]}
+          style={dinamikStiller.klavyeAcBtn}
           onPress={klavyeyiAc}
           activeOpacity={0.7}
         >
-          <MaterialCommunityIcons name="keyboard" size={22} color="#fff" />
-          <Text style={styles.addText}>Klavyeyi Aç</Text>
+          <MaterialCommunityIcons name="keyboard" size={22} color={tema.butonMetin} />
+          <Text style={dinamikStiller.addText}>Klavyeyi Aç</Text>
         </TouchableOpacity>
       )}
 
       <TouchableOpacity
-        style={styles.addBtn}
+        style={dinamikStiller.addBtn}
         onPress={urunEkle}
         activeOpacity={0.7}
       >
-        <MaterialCommunityIcons name="plus" size={22} color="#fff" />
-        <Text style={styles.addText}>
+        <MaterialCommunityIcons name="plus" size={22} color={tema.butonMetin} />
+        <Text style={dinamikStiller.addText}>
           {hizliMod ? "Hızlı Ekle (Miktar: 1)" : "Ürün Ekle"}
         </Text>
       </TouchableOpacity>
 
       {/* Ürün sayısı ve limit bilgisi */}
       {urunler.length > 0 && (
-        <View style={styles.countContainer}>
-          <Text style={styles.countText}>
+        <View style={dinamikStiller.countContainer}>
+          <Text style={dinamikStiller.countText}>
             Toplam: {urunler.length} ürün
             {gosterilecekUrunler.length < urunler.length
               ? ` (Son ${gosterilecekUrunler.length} gösteriliyor)`
               : ""}
           </Text>
-          <Text style={extraStyles.limitBilgisi}>
+          <Text style={[
+            dinamikStiller.limitBilgisi,
+            { color: urunler.length >= 45 ? (karanlikTema ? "#ff6b6b" : "#dc3545") : tema.ikincilMetin }
+          ]}>
             {urunler.length >= 40 && urunler.length < 50
               ? `Limit: ${urunler.length}/50 ürün`
               : ""}
@@ -521,11 +797,11 @@ export default function SayimDetay({ route, navigation }) {
         ref={flatListRef}
         data={gosterilecekUrunler}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <UrunSatiri item={item} onSil={urunSil} />}
+        renderItem={({ item }) => <UrunSatiri item={item} onSil={urunSil} tema={tema} />}
         ListEmptyComponent={
-          <Text style={common.subtitle}>Bu sayımda henüz ürün yok.</Text>
+          <Text style={dinamikStiller.subtitle}>Bu sayımda henüz ürün yok.</Text>
         }
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
+        ItemSeparatorComponent={() => <View style={dinamikStiller.separator} />}
         style={{ flex: 1, marginTop: 10 }}
         initialNumToRender={10}
         maxToRenderPerBatch={5}
@@ -539,61 +815,24 @@ export default function SayimDetay({ route, navigation }) {
       />
       {sayimDurum !== "kapandi" && (
         <TouchableOpacity
-          style={[styles.addBtn, { backgroundColor: "gray", marginTop: 10 }]}
+          style={dinamikStiller.sonlandirBtn}
           onPress={sayimiSonlandir}
           activeOpacity={0.7}
         >
-          <MaterialCommunityIcons name="lock-check" size={22} color="#fff" />
-          <Text style={styles.addText}>Sayımı Sonlandır</Text>
+          <MaterialCommunityIcons name="lock-check" size={22} color={tema.butonMetin} />
+          <Text style={dinamikStiller.addText}>Sayımı Sonlandır</Text>
         </TouchableOpacity>
       )}
       {sayimDurum === "kapandi" && (
         <TouchableOpacity
-          style={[styles.addBtn, { backgroundColor: "#28a745", marginTop: 10 }]}
+          style={dinamikStiller.devamEtBtn}
           onPress={sayimaDevamEt}
           activeOpacity={0.7}
         >
-          <MaterialCommunityIcons name="refresh" size={22} color="#fff" />
-          <Text style={styles.addText}>Devam Et</Text>
+          <MaterialCommunityIcons name="refresh" size={22} color={tema.butonMetin} />
+          <Text style={dinamikStiller.addText}>Devam Et</Text>
         </TouchableOpacity>
       )}
     </KeyboardAvoidingView>
   );
 }
-
-// Ek stiller
-const extraStyles = StyleSheet.create({
-  uyariKutusu: {
-    backgroundColor: "#fff3cd",
-    borderColor: "#ffeeba",
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 10,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  uyariMetni: {
-    color: "#856404",
-    fontSize: 12,
-    flex: 1,
-  },
-  tamSurumeGecBtn: {
-    backgroundColor: "#007bff",
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 4,
-    marginLeft: 10,
-  },
-  tamSurumeGecBtnText: {
-    color: "#fff",
-    fontSize: 10,
-    fontWeight: "bold",
-  },
-  limitBilgisi: {
-    fontSize: 12,
-    color: (urunler) => (urunler.length >= 45 ? "#dc3545" : "#6c757d"),
-    fontWeight: (urunler) => (urunler.length >= 45 ? "bold" : "normal"),
-  },
-});

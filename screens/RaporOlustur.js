@@ -1,15 +1,17 @@
 // e:\edev\stok-sayim\screens\RaporOlustur.js
 import React, { useLayoutEffect, useEffect, useState } from "react";
-import { View, Text, Alert, TouchableOpacity, ScrollView } from "react-native";
+import { View, Text, Alert, TouchableOpacity, ScrollView, StyleSheet } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as FileSystem from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import * as Print from "expo-print";
+import { useTema } from "../contexts/ThemeContext"; // ThemeContext'i import et
 
 import common from "../styles/CommonStyles";
 import styles from "../styles/RaporOlusturStyles";
 
 export default function RaporOlustur({ navigation, route }) {
+  const { tema, karanlikTema } = useTema(); // ThemeContext'ten tema bilgilerini al
   const { sayimId, sayimNot } = route.params || {};
 
   // Eğer sayimId veya sayimNot yoksa, kullanıcıyı uyar ve geri gönder
@@ -122,6 +124,23 @@ export default function RaporOlustur({ navigation, route }) {
       )
       .join("");
 
+    // PDF için karanlık tema desteği ekle
+    const pdfStyle = karanlikTema 
+      ? `
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #2d2d2d; color: #fff; }
+        table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+        th, td { border: 1px solid #555; padding: 8px; text-align: left; }
+        th { background-color: #444; }
+        h1 { text-align: center; }
+      `
+      : `
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+        th, td { border: 1px solid #000; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        h1 { text-align: center; }
+      `;
+
     return `
       <!DOCTYPE html>
       <html>
@@ -129,11 +148,7 @@ export default function RaporOlustur({ navigation, route }) {
           <meta charset="UTF-8" />
           <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no" />
           <style>
-            body { font-family: Arial, sans-serif; margin: 20px; }
-            table { border-collapse: collapse; width: 100%; margin-top: 20px; }
-            th, td { border: 1px solid #000; padding: 8px; text-align: left; }
-            th { background-color: #f2f2f2; }
-            h1 { text-align: center; }
+            ${pdfStyle}
           </style>
         </head>
         <body>
@@ -242,45 +257,88 @@ export default function RaporOlustur({ navigation, route }) {
     }
   };
 
-  const kart = (baslik, onPress, renk) => (
-    <TouchableOpacity
-      style={[styles.card, { borderColor: renk }]}
-      onPress={onPress}
-    >
-      <Text style={[styles.cardTitle, { color: renk }]}>{baslik}</Text>
-    </TouchableOpacity>
-  );
+  // Tema renklerini kullanarak dinamik stiller oluştur
+  const dinamikStiller = StyleSheet.create({
+    container: {
+      flex: 1,
+      padding: 16,
+      backgroundColor: tema.arkaplan,
+    },
+    subtitle: {
+      fontWeight: "bold", 
+      fontSize: 18,
+      color: tema.metin,
+      textAlign: "center",
+      marginVertical: 10,
+    },
+    urunSayisi: {
+      textAlign: "center", 
+      color: tema.ikincilMetin,
+      marginBottom: 10,
+    },
+    cardContainer: {
+      marginTop: 20,
+    },
+    card: {
+      backgroundColor: tema.kart,
+      borderWidth: 2,
+      borderRadius: 8,
+      padding: 20,
+      marginVertical: 10,
+      alignItems: "center",
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: karanlikTema ? 0.3 : 0.1,
+      shadowRadius: 4,
+      elevation: 3,
+    },
+    cardTitle: {
+      fontSize: 18,
+      fontWeight: "bold",
+    }
+  });
+
+  const kart = (baslik, onPress, renk) => {
+    // Karanlık temada daha uygun renkler kullan
+    const renkDegeri = karanlikTema ? {
+      "#007bff": "#4a9eff", // Mavi rengi daha açık
+      "#28a745": "#4caf50", // Yeşil rengi daha açık
+      "#6f42c1": "#9b74d2"  // Mor rengi daha açık
+    }[renk] || renk : renk;
+    
+    return (
+      <TouchableOpacity
+        style={[dinamikStiller.card, { borderColor: renkDegeri }]}
+        onPress={onPress}
+      >
+        <Text style={[dinamikStiller.cardTitle, { color: renkDegeri }]}>{baslik}</Text>
+      </TouchableOpacity>
+    );
+  };
 
   // Eğer sayimId veya sayimNot yoksa, boş bir ekran göster veya yükleniyor mesajı
   if (!sayimId || !sayimNot) {
     return (
-      <View style={common.container}>
-        <Text>Yükleniyor...</Text>
+      <View style={dinamikStiller.container}>
+        <Text style={{ color: tema.metin }}>Yükleniyor...</Text>
       </View>
     );
   }
 
   return (
-    <ScrollView contentContainerStyle={common.container}>
-      <Text
-        style={[
-          common.subtitle,
-          {
-            fontWeight: "bold", // Fontu kalın yapıyoruz
-            fontSize: 18, // Mevcut 16 punto + 2 punto = 18 punto
-          },
-        ]}
-      >
+    <ScrollView 
+      style={{ backgroundColor: tema.arkaplan }}
+      contentContainerStyle={dinamikStiller.container}
+    >
+      <Text style={dinamikStiller.subtitle}>
         Seçilen Sayım: {sayimNot}
       </Text>
 
-      <View>
-        <Text style={{ textAlign: "center", color: "#666" }}>
-          Toplam {urunler.length} Ürün
-        </Text>
-      </View>
+      <Text style={dinamikStiller.urunSayisi}>
+        Toplam {urunler.length} Ürün
+      </Text>
 
-      <View style={{ marginTop: 20 }}>
+      <View style={dinamikStiller.cardContainer}>
         {kart("CSV Olarak Dışa Aktar", raporCSV, "#007bff")}
         {kart("PDF Olarak Dışa Aktar", raporPDF, "#28a745")}
         {kart("JSON Olarak Dışa Aktar", raporJSON, "#6f42c1")}

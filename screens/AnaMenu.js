@@ -7,12 +7,12 @@ import {
   ScrollView,
   StyleSheet,
   Alert,
-  Modal, // Modal bileşenini import ediyoruz
-  TouchableWithoutFeedback, // Dışarı tıklamayı yakalamak için
+  Modal,
+  TouchableWithoutFeedback,
 } from "react-native";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
-import styles from "../styles/AnaMenuStyles"; // Stil dosyasını import ediyoruz
+import { useTema } from "../contexts/ThemeContext"; // ThemeContext'i import et
 import {
   lisansBilgisiYukle,
   denemeSuresiniKontrolEt,
@@ -42,18 +42,18 @@ const menuItems = [
     id: "3",
     title: "Rapor Oluştur",
     icon: "file-chart-outline",
-    screen: "SayimListesi", // Rapor oluşturmak için SayimListesi'ne yönlendir
-    params: { purpose: "selectForReport" }, // Özel parametre
+    screen: "SayimListesi",
+    params: { purpose: "selectForReport" },
     description: "Sayı seçerek rapor oluşturun.",
   },
-  // { id: '4', title: 'Ayarlar', icon: 'cog-outline', screen: 'Ayarlar', description: 'Uygulama ayarlarını yapılandırın.' },
 ];
 
 export default function AnaMenu() {
   const navigation = useNavigation();
+  const { tema, karanlikTema } = useTema(); // ThemeContext'ten tema bilgilerini al
   const [lisansBilgisi, setLisansBilgisi] = useState(null);
   const [kalanGun, setKalanGun] = useState(0);
-  const [modalVisible, setModalVisible] = useState(false); // Modal görünürlüğü için state
+  const [modalVisible, setModalVisible] = useState(false);
 
   // Lisans bilgilerini yükle
   const lisansBilgileriniYukle = async () => {
@@ -102,8 +102,8 @@ export default function AnaMenu() {
 
   // Ayarlar menüsüne tıklandığında
   const ayarlariGoster = () => {
-    // Şimdilik boş bir işlem, ileride ayarlar ekranına yönlendirilebilir
-    Alert.alert("Bilgi", "Ayarlar menüsü yakında eklenecek.");
+    // Ayarlar ekranına yönlendir
+    navigation.navigate("Ayarlar");
   };
 
   // Lisans kartı için duruma göre renk ve ikon belirle - Güvenlik kontrolü ekledik
@@ -176,47 +176,109 @@ export default function AnaMenu() {
   // Her render'da lisansKartBilgileri'ni hesapla
   const lisansKartBilgileri = getLisansKartBilgileri();
 
+  // Tema renklerini kullanarak dinamik stiller oluştur
+  const dinamikStiller = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: tema.arkaplan,
+      padding: 16,
+    },
+    kart: {
+      backgroundColor: tema.kart,
+      borderRadius: 12,
+      padding: 16,
+      marginBottom: 16,
+      flexDirection: "row",
+      alignItems: "center",
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: karanlikTema ? 0.3 : 0.1,
+      shadowRadius: 4,
+      elevation: 3,
+    },
+    kartBaslik: {
+      fontSize: 18,
+      fontWeight: "600",
+      marginBottom: 4,
+      color: tema.metin,
+    },
+    kartAciklama: {
+      fontSize: 14,
+      color: tema.ikincilMetin,
+    },
+    modalView: {
+      margin: 20,
+      backgroundColor: tema.kart,
+      borderRadius: 12,
+      padding: 25,
+      alignItems: "flex-start",
+      shadowColor: "#000",
+      shadowOffset: {
+        width: 0,
+        height: 2,
+      },
+      shadowOpacity: 0.25,
+      shadowRadius: 4,
+      elevation: 5,
+      width: "85%",
+      maxWidth: 400,
+    },
+    modalTitle: {
+      fontSize: 20,
+      fontWeight: "bold",
+      marginBottom: 15,
+      alignSelf: "center",
+      color: tema.metin,
+    },
+    modalText: {
+      marginBottom: 20,
+      fontSize: 16,
+      lineHeight: 24,
+      color: tema.metin,
+    },
+  });
+
   return (
-    <View style={styles.container}>
+    <View style={dinamikStiller.container}>
       <ScrollView>
         {/* Mevcut Menü Öğeleri */}
         {menuItems.map((item) => (
           <TouchableOpacity
             key={item.id}
-            style={styles.kart}
+            style={dinamikStiller.kart}
             onPress={() => handlePress(item.screen, item.params)}
           >
             <MaterialCommunityIcons
               name={item.icon}
               size={30}
-              color={USTAHESAP_TURKUAZ} // UstaHesap turkuaz rengi
+              color={tema.vurgu}
             />
             <View style={{ flex: 1, marginLeft: 16 }}>
-              <Text style={styles.kartBaslik}>{item.title}</Text>
-              <Text style={styles.kartAciklama}>{item.description}</Text>
+              <Text style={dinamikStiller.kartBaslik}>{item.title}</Text>
+              <Text style={dinamikStiller.kartAciklama}>{item.description}</Text>
             </View>
           </TouchableOpacity>
         ))}
 
-        {/* Ayarlar Kartı - YENİ */}
-        <TouchableOpacity style={styles.kart} onPress={ayarlariGoster}>
+        {/* Ayarlar Kartı */}
+        <TouchableOpacity style={dinamikStiller.kart} onPress={ayarlariGoster}>
           <MaterialCommunityIcons
             name="cog-outline"
             size={30}
-            color={USTAHESAP_TURKUAZ} // UstaHesap turkuaz rengi
+            color={tema.vurgu}
           />
           <View style={{ flex: 1, marginLeft: 16 }}>
-            <Text style={styles.kartBaslik}>Ayarlar</Text>
-            <Text style={styles.kartAciklama}>
+            <Text style={dinamikStiller.kartBaslik}>Ayarlar</Text>
+            <Text style={dinamikStiller.kartAciklama}>
               Uygulama ayarlarını yapılandırın.
             </Text>
           </View>
         </TouchableOpacity>
 
-        {/* Lisans Bilgisi Kartı - Güvenlik kontrolü ekledik */}
+        {/* Lisans Bilgisi Kartı */}
         <TouchableOpacity
           style={[
-            styles.kart,
+            dinamikStiller.kart,
             {
               borderLeftColor: lisansKartBilgileri?.renk || "#6c757d",
               borderLeftWidth: 5,
@@ -231,17 +293,17 @@ export default function AnaMenu() {
             color={lisansKartBilgileri?.renk || "#6c757d"}
           />
           <View style={{ flex: 1, marginLeft: 16 }}>
-            <Text style={styles.kartBaslik}>
+            <Text style={dinamikStiller.kartBaslik}>
               {lisansKartBilgileri?.baslik || "Lisans Bilgisi"}
             </Text>
-            <Text style={styles.kartAciklama}>
+            <Text style={dinamikStiller.kartAciklama}>
               {lisansKartBilgileri?.aciklama || "Yükleniyor..."}
             </Text>
           </View>
           <MaterialCommunityIcons
             name="chevron-right"
             size={24}
-            color="#6c757d"
+            color={tema.ikincilMetin}
           />
         </TouchableOpacity>
       </ScrollView>
@@ -256,9 +318,9 @@ export default function AnaMenu() {
         <TouchableWithoutFeedback onPress={() => setModalVisible(false)}>
           <View style={modalStyles.centeredView}>
             <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
-              <View style={modalStyles.modalView}>
-                <Text style={modalStyles.modalTitle}>Lisans Bilgileri</Text>
-                <Text style={modalStyles.modalText}>
+              <View style={dinamikStiller.modalView}>
+                <Text style={dinamikStiller.modalTitle}>Lisans Bilgileri</Text>
+                <Text style={dinamikStiller.modalText}>
                   {getLisansBilgisiIcerigi()}
                 </Text>
 
@@ -291,41 +353,13 @@ export default function AnaMenu() {
   );
 }
 
-// Modal için yeni stiller
+// Modal için sabit stiller
 const modalStyles = StyleSheet.create({
   centeredView: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.5)", // Yarı saydam arka plan
-  },
-  modalView: {
-    margin: 20,
-    backgroundColor: "white",
-    borderRadius: 12,
-    padding: 25,
-    alignItems: "flex-start",
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-    width: "85%",
-    maxWidth: 400,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    marginBottom: 15,
-    alignSelf: "center",
-  },
-  modalText: {
-    marginBottom: 20,
-    fontSize: 16,
-    lineHeight: 24,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
   },
   buttonContainer: {
     flexDirection: "row",

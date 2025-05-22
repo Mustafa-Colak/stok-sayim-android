@@ -8,14 +8,17 @@ import {
   FlatList,
   Alert,
   TouchableOpacity,
+  StyleSheet,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
+import { useTema } from "../contexts/ThemeContext"; // ThemeContext'i import et
 
-import commonStyles from "../styles/CommonStyles"; // commonStyles olarak import ettim
-import yeniSayimStyles from "../styles/YeniSayimStyles"; // yeniSayimStyles olarak import ettim
+import commonStyles from "../styles/CommonStyles"; 
+import yeniSayimStyles from "../styles/YeniSayimStyles";
 
 export default function YeniSayim({ navigation }) {
+  const { tema, karanlikTema } = useTema(); // ThemeContext'ten tema bilgilerini al
   const [sayimNotu, setSayimNotu] = useState("");
   const [oncekiSayimlar, setOncekiSayimlar] = useState([]);
 
@@ -39,7 +42,7 @@ export default function YeniSayim({ navigation }) {
 
   const sayimEkle = async () => {
     if (!sayimNotu.trim()) {
-      Alert.alert("Uyarı", "Sayım notu boş olamaz.");
+      Alert.alert("Uyarı", "Sayım adı boş olamaz.");
       return;
     }
 
@@ -69,7 +72,7 @@ export default function YeniSayim({ navigation }) {
       if (ayniNotVar) {
         Alert.alert(
           "Uyarı",
-          `"${sayimNotuTarihli}" notuyla bir sayım zaten var.`
+          `"${sayimNotuTarihli}" adıyla bir sayım zaten var.`
         );
         return;
       }
@@ -93,39 +96,99 @@ export default function YeniSayim({ navigation }) {
     }
   };
 
+  // Tema renklerini kullanarak dinamik stiller oluştur
+  const dinamikStiller = StyleSheet.create({
+    container: {
+      flex: 1,
+      padding: 16,
+      backgroundColor: tema.arkaplan,
+    },
+    input: {
+      borderWidth: 1,
+      borderColor: tema.girdiBorder,
+      backgroundColor: tema.girdi,
+      color: tema.metin,
+      borderRadius: 4,
+      padding: 12,
+      marginBottom: 10,
+      fontSize: 16,
+    },
+    button: {
+      backgroundColor: tema.buton,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 12,
+      borderRadius: 4,
+      marginVertical: 10,
+    },
+    buttonText: {
+      color: tema.butonMetin,
+      fontSize: 16,
+      fontWeight: "bold",
+      marginLeft: 8,
+    },
+    subtitle: {
+      fontSize: 14,
+      color: tema.ikincilMetin,
+      marginBottom: 16,
+      textAlign: "center",
+    },
+    listHeader: {
+      marginTop: 30,
+      marginBottom: 10,
+      textAlign: "left",
+      fontWeight: "bold",
+      color: tema.metin,
+    },
+    listItemContainer: {
+      paddingVertical: 6,
+      borderBottomWidth: 1,
+      borderBottomColor: tema.sinir,
+    },
+    listItemText: {
+      fontSize: 16,
+      color: tema.metin,
+    },
+    listItemDate: {
+      fontSize: 12,
+      color: tema.ikincilMetin,
+      marginLeft: 10,
+    },
+    emptyListText: {
+      color: tema.ikincilMetin,
+      fontStyle: "italic",
+      textAlign: "center",
+      marginTop: 10,
+    }
+  });
+
   return (
-    <View style={yeniSayimStyles.container}>
+    <View style={dinamikStiller.container}>
       <TextInput
-        style={yeniSayimStyles.input}
-        placeholder="Yeni sayım notu girin (örn: Depo A Rafları)"
+        style={dinamikStiller.input}
+        placeholder="Yeni sayım adı girin (örn: Depo A Rafları)"
+        placeholderTextColor={tema.ikincilMetin}
         value={sayimNotu}
         onChangeText={setSayimNotu}
       />
 
-      <Text style={commonStyles.subtitle}>
-        Aynı not ile sayım oluşturmamaya dikkat edin. Tarih otomatik
+      <Text style={dinamikStiller.subtitle}>
+        Aynı ad ile sayım oluşturmamaya dikkat edin. Tarih otomatik
         eklenecektir.
       </Text>
 
-      <TouchableOpacity style={yeniSayimStyles.button} onPress={sayimEkle}>
+      <TouchableOpacity style={dinamikStiller.button} onPress={sayimEkle}>
         <MaterialCommunityIcons
           name="plus-circle-outline"
           size={20}
-          color="#fff"
+          color={tema.butonMetin}
         />
-        <Text style={yeniSayimStyles.buttonText}>Sayımı Oluştur ve Başla</Text>
+        <Text style={dinamikStiller.buttonText}>Sayımı Oluştur ve Başla</Text>
       </TouchableOpacity>
 
       <Text
-        style={[
-          commonStyles.subtitle,
-          {
-            marginTop: 30,
-            marginBottom: 10,
-            textAlign: "left",
-            fontWeight: "bold",
-          },
-        ]}
+        style={dinamikStiller.listHeader}
       >
         📄 Önceki Sayımlar:
       </Text>
@@ -133,29 +196,15 @@ export default function YeniSayim({ navigation }) {
         data={oncekiSayimlar}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <View
-            style={{
-              paddingVertical: 6,
-              borderBottomWidth: 1,
-              borderBottomColor: "#eee",
-            }}
-          >
-            <Text style={{ fontSize: 16 }}>• {item.not}</Text>
-            {/* 'item.ad' yerine 'item.not' */}
-            <Text style={{ fontSize: 12, color: "#777", marginLeft: 10 }}>
+          <View style={dinamikStiller.listItemContainer}>
+            <Text style={dinamikStiller.listItemText}>• {item.not}</Text>
+            <Text style={dinamikStiller.listItemDate}>
               {new Date(item.tarih).toLocaleDateString("tr-TR")}
             </Text>
           </View>
         )}
         ListEmptyComponent={
-          <Text
-            style={{
-              color: "#888",
-              fontStyle: "italic",
-              textAlign: "center",
-              marginTop: 10,
-            }}
-          >
+          <Text style={dinamikStiller.emptyListText}>
             Henüz sayım kaydı yok.
           </Text>
         }
