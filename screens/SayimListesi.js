@@ -1,340 +1,379 @@
 // e:\edev\stok-sayim\screens\SayimListesi.js
-import React, { useState, useCallback, useLayoutEffect } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   View,
   Text,
   FlatList,
   TouchableOpacity,
   Alert,
-  RefreshControl,
   StyleSheet,
+  RefreshControl,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useFocusEffect } from "@react-navigation/native";
+import common from "../styles/CommonStyles";
 import {
-  useNavigation,
-  useFocusEffect,
-  useRoute,
-} from "@react-navigation/native";
-import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
-import Swipeable from "react-native-gesture-handler/Swipeable";
-import styles from "../styles/SayimListesiStyles"; // Stil dosyasını import ediyoruz
+  sayimSayisiLimitiniKontrolEt,
+  denemeSuresiniKontrolEt,
+} from "../utils/LisansYonetimi";
 
-export default function SayimListesi() {
-  const navigation = useNavigation();
-  const route = useRoute(); // route parametrelerine erişim için
+export default function SayimListesi({ navigation, route }) {
   const [sayimlar, setSayimlar] = useState([]);
-  const [refreshing, setRefreshing] = useState(false);
-  const [silinenSayimId, setSilinenSayimId] = useState(null);
-  const [kapatilanSayimId, setKapatilanSayimId] = useState(null);
-  let rowRefs = new Map();
+  const [yukleniyor, setYukleniyor] = useState(true);
+  const [yenileniyor, setYenileniyor] = useState(false);
+  const [kalanGun, setKalanGun] = useState(0);
 
-  const isSelectForReportMode = route.params?.purpose === "selectForReport";
+  // Rapor oluşturma amacıyla mı açıldı?
+  const isForReport = route.params?.purpose === "selectForReport";
 
-  const fetchSayimlar = useCallback(async () => {
-    setRefreshing(true);
+  // Sayfa her odaklandığında sayımları yükle
+  useFocusEffect(
+    useCallback(() => {
+      // Route params'tan durum güncellemesi kontrolü
+      if (route.params?.durumuGuncelle) {
+        sayimlariYukle();
+        // Parametreyi temizle
+        navigation.setParams({ durumuGuncelle: undefined });
+      }
+
+      // Lisans durumunu kontrol et
+      lisansDurumunuKontrolEt();
+    }, [route.params])
+  );
+
+  // Sayfa ilk yüklendiğinde
+  useEffect(() => {
+    sayimlariYukle();
+
+    // Rapor oluşturma amacıyla açıldıysa başlığı güncelle
+    if (isForReport) {
+      navigation.setOptions({
+        title: "Rapor İçin Sayım Seçin",
+      });
+    }
+  }, []);
+
+  // Lisans durumunu kontrol et
+  const lisansDurumunuKontrolEt = async () => {
+    const sureDurumu = await denemeSuresiniKontrolEt();
+    if (!sureDurumu.sureDoldu && sureDurumu.kalanGun <= 5) {
+      // Son 5 gün kaldığında uyarı göster
+      setKalanGun(sureDurumu.kalanGun);
+    } else {
+      setKalanGun(0);
+    }
+  };
+
+  // Sayımları yükleme fonksiyonu
+  const sayimlariYukle = async () => {
+    setYukleniyor(true);
     try {
-      const sayimlarListesiStr = await AsyncStorage.getItem("sayimlar");
-      if (sayimlarListesiStr) {
-        const sayimlarMetadaListesi = JSON.parse(sayimlarListesiStr);
-
-        const enrichedSayimlar = await Promise.all(
-          sayimlarMetadaListesi.map(async (meta) => {
-            let urunSayisi = 0;
-            if (meta.id) {
-              try {
-                const urunlerStr = await AsyncStorage.getItem(
-                  `sayim_${meta.id}`
-                );
-                if (urunlerStr) {
-                  const urunler = JSON.parse(urunlerStr);
-                  urunSayisi = urunler.length;
-                }
-              } catch (e) {
-                console.error(
-                  `SayimListesi: sayim ${meta.id} için ürün sayısı alınırken hata:`,
-                  e
-                );
-                urunSayisi = meta.urunSayisi || 0;
-              }
-            } else {
-              urunSayisi = meta.urunSayisi || 0;
-            }
-            return {
-              id: meta.id,
-              not: meta.not, 
-              tarih: meta.tarih, 
-              durum: meta.durum || "Başlamadı",
-              urunSayisi: urunSayisi,
-            };
-          })
-        );
-
-        setSayimlar(
-          enrichedSayimlar.sort((a, b) => {
-            const dateA = a.tarih ? new Date(a.tarih) : null;
-            const dateB = b.tarih ? new Date(b.tarih) : null;
-
-            // Geçersiz tarihleri sona at
-            if (dateA && isNaN(dateA.getTime())) return 1;
-            if (dateB && isNaN(dateB.getTime())) return -1;
-            if (!dateA && dateB) return 1;
-            if (dateA && !dateB) return -1;
-            if (!dateA && !dateB) return 0; // İkisi de null ise sıralama değişmesin
-
-            return dateB - dateA; // En yeni tarih en üste
-          })
-        );
+      const veri = await AsyncStorage.getItem("sayimlar");
+      if (veri) {
+        const liste = JSON.parse(veri);
+        // Sayımları tarihe göre sırala (en yeni en üstte)
+        liste.sort((a, b) => new Date(b.tarih) - new Date(a.tarih));
+        setSayimlar(liste);
       } else {
         setSayimlar([]);
       }
     } catch (error) {
-      console.error("Sayimlar yüklenirken hata:", error);
-      Alert.alert("Hata", "Sayımlar yüklenemedi.");
+      console.error("Sayım yükleme hatası:", error);
+      Alert.alert("Hata", "Sayımlar yüklenirken bir sorun oluştu.");
+    } finally {
+      setYukleniyor(false);
+      setYenileniyor(false);
     }
-    setRefreshing(false);
-  }, []);
-
-  useLayoutEffect(() => {
-    navigation.setOptions({
-      title: isSelectForReportMode
-        ? "Rapor için Sayım Seçin"
-        : "Stok Sayım / Sayımlar",
-      headerRight: () =>
-        !isSelectForReportMode && (
-          <MaterialCommunityIcons
-            name="plus-circle-outline"
-            size={28}
-            color="#fff"
-            style={{ marginRight: 16 }}
-            onPress={() => navigation.navigate("YeniSayim")}
-          />
-        ),
-      headerTintColor: "#fff",
-      headerStyle: { backgroundColor: "#007bff" },
-    });
-  }, [navigation, isSelectForReportMode]);
-
-  useFocusEffect(
-    useCallback(() => {
-      fetchSayimlar();
-      if (silinenSayimId) setSilinenSayimId(null);
-      if (kapatilanSayimId) setKapatilanSayimId(null);
-      return () => {
-        rowRefs.forEach((ref) => ref?.close());
-        rowRefs.clear();
-      };
-    }, [fetchSayimlar, silinenSayimId, kapatilanSayimId])
-  );
-
-  const handleKapat = async (sayimId, sayimNotu) => {
-    Alert.alert(
-      "Sayımı Kapat",
-      `"${sayimNotu}" notlu sayımı kapatmak istediğinizden emin misiniz? Kapatılan sayım düzenlenemez.`,
-      [
-        { text: "Vazgeç", style: "cancel" },
-        {
-          text: "Evet, Kapat",
-          onPress: async () => {
-            try {
-              const sayimlarStr = await AsyncStorage.getItem("sayimlar");
-              if (sayimlarStr) {
-                let sayimlarArray = JSON.parse(sayimlarStr);
-                sayimlarArray = sayimlarArray.map((s) =>
-                  s.id === sayimId ? { ...s, durum: "Kapandı" } : s
-                );
-                await AsyncStorage.setItem(
-                  "sayimlar",
-                  JSON.stringify(sayimlarArray)
-                );
-                setKapatilanSayimId(sayimId); // Animasyon için
-                fetchSayimlar(); // Listeyi yenile
-              }
-            } catch (error) {
-              console.error("Sayım kapatma hatası:", error);
-              Alert.alert("Hata", "Sayım kapatılamadı.");
-            }
-          },
-        },
-      ]
-    );
   };
 
-  const handleSil = async (sayimId, sayimNotu) => {
-    Alert.alert(
-      "Sayımı Sil",
-      `"${sayimNotu}" notlu sayımı silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.`,
-      [
-        { text: "Vazgeç", style: "cancel" },
+  // Yenileme işlemi
+  const yenile = () => {
+    setYenileniyor(true);
+    sayimlariYukle();
+  };
+
+  // Yeni sayım oluşturma fonksiyonu
+  const yeniSayimOlustur = async () => {
+    // Önce deneme süresi kontrolü
+    const sureDurumu = await denemeSuresiniKontrolEt();
+    if (sureDurumu.sureDoldu) {
+      Alert.alert("Deneme Süresi Doldu", sureDurumu.mesaj, [
         {
-          text: "Evet, Sil",
-          style: "destructive",
+          text: "Tam Sürüme Geç",
+          onPress: () => navigation.navigate("Ayarlar"),
+        },
+        { text: "Kapat", style: "cancel" },
+      ]);
+      return;
+    }
+
+    // Sonra sayım sayısı limiti kontrolü
+    const limitDurumu = await sayimSayisiLimitiniKontrolEt();
+    if (limitDurumu.limitAsildi) {
+      Alert.alert("Limit Aşıldı", limitDurumu.mesaj, [
+        {
+          text: "Tam Sürüme Geç",
+          onPress: () => navigation.navigate("Ayarlar"),
+        },
+        { text: "Kapat", style: "cancel" },
+      ]);
+      return;
+    }
+
+    // Limit aşılmadıysa yeni sayım oluşturmaya devam et
+    navigation.navigate("YeniSayim");
+  };
+
+  // Sayım silme fonksiyonu
+  const sayimSil = (id, not) => {
+    Alert.alert(
+      "Sayım Sil",
+      `"${not}" sayımını silmek istediğinize emin misiniz?`,
+      [
+        { text: "İptal", style: "cancel" },
+        {
+          text: "Sil",
           onPress: async () => {
             try {
-              // Ana sayımlar listesinden sil
-              const sayimlarStr = await AsyncStorage.getItem("sayimlar");
-              if (sayimlarStr) {
-                let sayimlarArray = JSON.parse(sayimlarStr);
-                sayimlarArray = sayimlarArray.filter((s) => s.id !== sayimId);
-                await AsyncStorage.setItem(
-                  "sayimlar",
-                  JSON.stringify(sayimlarArray)
-                );
-              }
-              // Sayıma ait ürünleri sil
-              await AsyncStorage.removeItem(`sayim_${sayimId}`);
-              setSilinenSayimId(sayimId); // Animasyon için
-              fetchSayimlar(); // Listeyi yenile
+              // Önce sayımı listeden kaldır
+              const yeniListe = sayimlar.filter((s) => s.id !== id);
+              await AsyncStorage.setItem("sayimlar", JSON.stringify(yeniListe));
+              setSayimlar(yeniListe);
+
+              // Sonra sayıma ait ürünleri sil
+              await AsyncStorage.removeItem(`sayim_${id}`);
+
+              Alert.alert("Başarılı", "Sayım başarıyla silindi.");
             } catch (error) {
               console.error("Sayım silme hatası:", error);
-              Alert.alert("Hata", "Sayım silinemedi.");
+              Alert.alert("Hata", "Sayım silinirken bir sorun oluştu.");
             }
           },
+          style: "destructive",
         },
       ]
     );
   };
 
-  const handleSayimPress = (item) => {
-    if (isSelectForReportMode) {
+  // Sayım durumuna göre renk belirleme
+  const durumRenginiGetir = (durum) => {
+    switch (durum) {
+      case "baslamamis":
+        return "#6c757d"; // Gri
+      case "devam":
+        return "#007bff"; // Mavi
+      case "kapandi":
+        return "#28a745"; // Yeşil
+      default:
+        return "#6c757d";
+    }
+  };
+
+  // Sayım durumuna göre metin belirleme
+  const durumMetniniGetir = (durum) => {
+    switch (durum) {
+      case "baslamamis":
+        return "Başlanmadı";
+      case "devam":
+        return "Devam Ediyor";
+      case "kapandi":
+        return "Tamamlandı";
+      default:
+        return "Bilinmiyor";
+    }
+  };
+
+  // Sayım öğesi seçildiğinde çağrılacak fonksiyon
+  const sayimSecildi = (item) => {
+    // Eğer rapor oluşturma amacıyla açıldıysa, RaporOlustur ekranına yönlendir
+    if (isForReport) {
       navigation.navigate("RaporOlustur", {
+        sayimId: item.id,
         sayimNot: item.not,
-        sayimId: item.id, // RaporOlustur ekranı sayimId'yi de bekliyor
       });
     } else {
+      // Normal durumda SayimDetay ekranına yönlendir
       navigation.navigate("SayimDetay", {
         sayimId: item.id,
         sayimNot: item.not,
-        sayimDurumu: item.durum,
       });
     }
   };
 
-  const renderRightActions = (progress, dragX, item) => {
-    if (item.durum === "Kapandı" || isSelectForReportMode) {
-      return null;
-    }
-    return (
-      <View style={{ flexDirection: "row" }}>
-        <TouchableOpacity
-          style={[styles.deleteButton, { backgroundColor: "#28a745" }]} // Yeşil renk kapatma için
-          onPress={() => {
-            rowRefs.get(item.id)?.close();
-            handleKapat(item.id, item.not);
-          }}
-        >
-          <MaterialCommunityIcons
-            name="check-circle-outline"
-            size={24}
-            color="#fff"
-          />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.deleteButton} // Kırmızı renk silme için (varsayılan)
-          onPress={() => {
-            rowRefs.get(item.id)?.close();
-            handleSil(item.id, item.not);
-          }}
-        >
-          <MaterialCommunityIcons
-            name="delete-outline"
-            size={24}
-            color="#fff"
-          />
-        </TouchableOpacity>
-      </View>
-    );
-  };
+  // Sayım öğesi render fonksiyonu - Tamamen yeniden düzenlendi
+  const renderSayimItem = ({ item }) => (
+    <TouchableOpacity
+      style={styles.sayimItem}
+      onPress={() => sayimSecildi(item)}
+    >
+      <View style={styles.sayimContent}>
+        <Text style={styles.sayimNot} numberOfLines={1} ellipsizeMode="tail">
+          {item.not || "İsimsiz Sayım"}
+        </Text>
 
-  const renderItem = ({ item }) => {
-    if (silinenSayimId === item.id || kapatilanSayimId === item.id) {
-      return (
-        <View style={styles.deletedRow}>
-          <Text style={styles.itemText}>
-            {kapatilanSayimId === item.id
-              ? `"${item.not}" kapatıldı.`
-              : `"${item.not}" silindi.`}
-          </Text>
+        <View
+          style={styles.durumBadge}
+          backgroundColor={durumRenginiGetir(item.durum)}
+        >
+          <Text style={styles.durumText}>{durumMetniniGetir(item.durum)}</Text>
         </View>
-      );
-    }
+      </View>
 
-    const durumStyle =
-      item.durum === "baslamamis" // Durumları küçük harfle kontrol et
-        ? styles.durumBaslamamis
-        : item.durum === "devam" // Durumları küçük harfle kontrol et
-        ? styles.durumDevam
-        : styles.durumKapandi;
-
-    let tarihGosterimi = "Tarih bilgisi yok";
-    if (item.tarih) {
-      const tarihObj = new Date(item.tarih);
-      if (!isNaN(tarihObj.getTime())) {
-        tarihGosterimi = tarihObj.toLocaleDateString("tr-TR");
-      }
-    }
-
-    return (
-      <Swipeable
-        ref={(ref) => rowRefs.set(item.id, ref)}
-        renderRightActions={(progress, dragX) =>
-          renderRightActions(progress, dragX, item)
-        }
-        overshootRight={false}
-        enabled={item.durum !== "Kapandı" && !isSelectForReportMode}
-      >
+      {/* Rapor oluşturma modunda silme butonu gösterme */}
+      {!isForReport && (
         <TouchableOpacity
-          style={styles.itemRow}
-          onPress={() => handleSayimPress(item)}
+          style={styles.silButon}
+          onPress={() => sayimSil(item.id, item.not)}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <View style={{ flex: 1 }}>
-            <Text style={styles.itemText}>{item.not}</Text>
-            <Text style={{ fontSize: 12, color: "#777" }}>
-              {tarihGosterimi} - {item.urunSayisi || 0} ürün
-            </Text>
-          </View>
-          <Text style={[styles.durumText, durumStyle]}>{item.durum}</Text>
+          <MaterialCommunityIcons
+            name="trash-can-outline"
+            size={22}
+            color="red"
+          />
         </TouchableOpacity>
-      </Swipeable>
-    );
-  };
+      )}
+    </TouchableOpacity>
+  );
 
   return (
-    <View style={styles.container}>
-      {sayimlar.length === 0 && !refreshing ? (
-        <View
-          style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
-        >
-          <Text style={{ fontSize: 18, color: "#888" }}>
-            Henüz sayım kaydı bulunmuyor.
+    <View style={common.container}>
+      <Text style={common.title}>
+        {isForReport ? "Rapor İçin Sayım Seçin" : "Sayım Listesi"}
+      </Text>
+
+      {/* Kalan gün uyarısı */}
+      {kalanGun > 0 && kalanGun <= 5 && (
+        <View style={styles.uyariKutusu}>
+          <Text style={styles.uyariMetni}>
+            Deneme sürenizin bitmesine {kalanGun} gün kaldı. Tam sürüme geçmeyi
+            düşünün.
           </Text>
-          {!isSelectForReportMode && (
-            <TouchableOpacity
-              style={[
-                styles.button,
-                { marginTop: 20, backgroundColor: "#28a745", width: "80%" },
-              ]}
-              onPress={() => navigation.navigate("YeniSayim")}
-            >
-              <MaterialCommunityIcons name="plus" size={20} color="#fff" />
-              <Text style={styles.buttonText}> Yeni Sayım Oluştur</Text>
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity
+            style={styles.tamSurumeGecBtn}
+            onPress={() => navigation.navigate("Ayarlar")}
+          >
+            <Text style={styles.tamSurumeGecBtnText}>Tam Sürüme Geç</Text>
+          </TouchableOpacity>
         </View>
-      ) : (
-        <FlatList
-          data={sayimlar}
-          renderItem={renderItem}
-          keyExtractor={(item) => item.id}
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={fetchSayimlar}
-              colors={["#007bff"]}
-            />
-          }
-        />
+      )}
+
+      <FlatList
+        data={sayimlar}
+        keyExtractor={(item) => item.id}
+        renderItem={renderSayimItem}
+        refreshControl={
+          <RefreshControl refreshing={yenileniyor} onRefresh={yenile} />
+        }
+        ListEmptyComponent={
+          yukleniyor ? (
+            <Text style={common.subtitle}>Yükleniyor...</Text>
+          ) : (
+            <Text style={common.subtitle}>Henüz sayım bulunmuyor.</Text>
+          )
+        }
+        contentContainerStyle={[
+          sayimlar.length === 0 && styles.emptyList,
+          styles.listContainer,
+        ]}
+        ItemSeparatorComponent={() => <View style={styles.separator} />}
+      />
+
+      {/* Rapor oluşturma modunda yeni sayım butonu gösterme */}
+      {!isForReport && (
+        <TouchableOpacity
+          style={common.fabButton}
+          onPress={yeniSayimOlustur}
+          activeOpacity={0.7}
+        >
+          <MaterialCommunityIcons name="plus" size={24} color="#fff" />
+        </TouchableOpacity>
       )}
     </View>
   );
 }
+
+// Stiller doğrudan bu dosyada tanımlandı
+const styles = StyleSheet.create({
+  listContainer: {
+    paddingHorizontal: 10,
+    paddingBottom: 80, // FAB için alan bırak
+  },
+  emptyList: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  sayimItem: {
+    backgroundColor: "#fff",
+    borderRadius: 8,
+    padding: 15,
+    marginVertical: 5,
+    flexDirection: "row",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  sayimContent: {
+    flex: 1,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  sayimNot: {
+    fontSize: 16,
+    fontWeight: "500",
+    flex: 1,
+    marginRight: 10,
+  },
+  durumBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 15,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  durumText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "bold",
+  },
+  silButon: {
+    marginLeft: 10,
+    padding: 5,
+  },
+  separator: {
+    height: 1,
+    backgroundColor: "#f0f0f0",
+  },
+  uyariKutusu: {
+    backgroundColor: "#fff3cd",
+    borderColor: "#ffeeba",
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 15,
+    marginHorizontal: 10,
+    marginBottom: 15,
+  },
+  uyariMetni: {
+    color: "#856404",
+    fontSize: 14,
+    marginBottom: 10,
+  },
+  tamSurumeGecBtn: {
+    backgroundColor: "#007bff",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 4,
+    alignSelf: "flex-end",
+  },
+  tamSurumeGecBtnText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "bold",
+  },
+});
