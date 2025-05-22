@@ -13,7 +13,13 @@ import {
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 import styles from "../styles/AnaMenuStyles"; // Stil dosyasını import ediyoruz
-import { lisansBilgisiYukle, denemeSuresiniKontrolEt } from "../utils/LisansYonetimi";
+import {
+  lisansBilgisiYukle,
+  denemeSuresiniKontrolEt,
+} from "../utils/LisansYonetimi";
+
+// UstaHesap turkuaz rengi
+const USTAHESAP_TURKUAZ = "#00a0b0";
 
 const menuItems = [
   {
@@ -54,7 +60,7 @@ export default function AnaMenu() {
     try {
       const bilgi = await lisansBilgisiYukle();
       setLisansBilgisi(bilgi);
-      
+
       const sureDurumu = await denemeSuresiniKontrolEt();
       if (!sureDurumu.sureDoldu && sureDurumu.kalanGun) {
         setKalanGun(sureDurumu.kalanGun);
@@ -94,6 +100,12 @@ export default function AnaMenu() {
     setModalVisible(true);
   };
 
+  // Ayarlar menüsüne tıklandığında
+  const ayarlariGoster = () => {
+    // Şimdilik boş bir işlem, ileride ayarlar ekranına yönlendirilebilir
+    Alert.alert("Bilgi", "Ayarlar menüsü yakında eklenecek.");
+  };
+
   // Lisans kartı için duruma göre renk ve ikon belirle - Güvenlik kontrolü ekledik
   const getLisansKartBilgileri = () => {
     // Varsayılan değerler tanımla
@@ -101,7 +113,7 @@ export default function AnaMenu() {
       renk: "#6c757d",
       ikon: "help-circle-outline",
       baslik: "Lisans Bilgisi",
-      aciklama: "Yükleniyor..."
+      aciklama: "Yükleniyor...",
     };
 
     // Lisans bilgisi yoksa varsayılan değerleri döndür
@@ -114,7 +126,7 @@ export default function AnaMenu() {
         renk: "#28a745",
         ikon: "check-circle-outline",
         baslik: "Tam Sürüm Lisansı",
-        aciklama: "Tüm özellikler aktif"
+        aciklama: "Tüm özellikler aktif",
       };
     } else {
       // Ücretsiz sürüm
@@ -123,14 +135,14 @@ export default function AnaMenu() {
           renk: "#dc3545",
           ikon: "alert-circle-outline",
           baslik: "Deneme Süresi Bitiyor",
-          aciklama: `Kalan gün: ${kalanGun}`
+          aciklama: `Kalan gün: ${kalanGun}`,
         };
       } else {
         return {
           renk: "#ffc107",
           ikon: "timer-sand",
           baslik: "Ücretsiz Deneme",
-          aciklama: `Kalan gün: ${kalanGun}`
+          aciklama: `Kalan gün: ${kalanGun}`,
         };
       }
     }
@@ -140,13 +152,14 @@ export default function AnaMenu() {
   const getLisansBilgisiIcerigi = () => {
     if (!lisansBilgisi) return "Lisans bilgileri yüklenemedi.";
 
-    const lisansTipi = lisansBilgisi.tip === "ucretli" ? "Tam Sürüm" : "Ücretsiz Deneme";
-    const baslangicTarihi = lisansBilgisi.baslangicTarihi 
-      ? new Date(lisansBilgisi.baslangicTarihi).toLocaleDateString('tr-TR') 
+    const lisansTipi =
+      lisansBilgisi.tip === "ucretli" ? "Tam Sürüm" : "Ücretsiz Deneme";
+    const baslangicTarihi = lisansBilgisi.baslangicTarihi
+      ? new Date(lisansBilgisi.baslangicTarihi).toLocaleDateString("tr-TR")
       : "Bilinmiyor";
-    
+
     let mesaj = `Lisans Tipi: ${lisansTipi}\nBaşlangıç Tarihi: ${baslangicTarihi}`;
-    
+
     if (lisansBilgisi.tip === "ucretsiz") {
       mesaj += `\nKalan Deneme Süresi: ${kalanGun} gün`;
       mesaj += "\n\nÜcretsiz sürüm limitleri:";
@@ -165,7 +178,6 @@ export default function AnaMenu() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.baslik}>Ana Menü</Text>
       <ScrollView>
         {/* Mevcut Menü Öğeleri */}
         {menuItems.map((item) => (
@@ -177,7 +189,7 @@ export default function AnaMenu() {
             <MaterialCommunityIcons
               name={item.icon}
               size={30}
-              color="#007bff"
+              color={USTAHESAP_TURKUAZ} // UstaHesap turkuaz rengi
             />
             <View style={{ flex: 1, marginLeft: 16 }}>
               <Text style={styles.kartBaslik}>{item.title}</Text>
@@ -186,15 +198,30 @@ export default function AnaMenu() {
           </TouchableOpacity>
         ))}
 
+        {/* Ayarlar Kartı - YENİ */}
+        <TouchableOpacity style={styles.kart} onPress={ayarlariGoster}>
+          <MaterialCommunityIcons
+            name="cog-outline"
+            size={30}
+            color={USTAHESAP_TURKUAZ} // UstaHesap turkuaz rengi
+          />
+          <View style={{ flex: 1, marginLeft: 16 }}>
+            <Text style={styles.kartBaslik}>Ayarlar</Text>
+            <Text style={styles.kartAciklama}>
+              Uygulama ayarlarını yapılandırın.
+            </Text>
+          </View>
+        </TouchableOpacity>
+
         {/* Lisans Bilgisi Kartı - Güvenlik kontrolü ekledik */}
         <TouchableOpacity
           style={[
-            styles.kart, 
-            { 
-              borderLeftColor: lisansKartBilgileri?.renk || "#6c757d", 
+            styles.kart,
+            {
+              borderLeftColor: lisansKartBilgileri?.renk || "#6c757d",
               borderLeftWidth: 5,
-              marginTop: 20
-            }
+              marginTop: 20,
+            },
           ]}
           onPress={lisansBilgileriniGoster}
         >
@@ -204,8 +231,12 @@ export default function AnaMenu() {
             color={lisansKartBilgileri?.renk || "#6c757d"}
           />
           <View style={{ flex: 1, marginLeft: 16 }}>
-            <Text style={styles.kartBaslik}>{lisansKartBilgileri?.baslik || "Lisans Bilgisi"}</Text>
-            <Text style={styles.kartAciklama}>{lisansKartBilgileri?.aciklama || "Yükleniyor..."}</Text>
+            <Text style={styles.kartBaslik}>
+              {lisansKartBilgileri?.baslik || "Lisans Bilgisi"}
+            </Text>
+            <Text style={styles.kartAciklama}>
+              {lisansKartBilgileri?.aciklama || "Yükleniyor..."}
+            </Text>
           </View>
           <MaterialCommunityIcons
             name="chevron-right"
@@ -227,8 +258,10 @@ export default function AnaMenu() {
             <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
               <View style={modalStyles.modalView}>
                 <Text style={modalStyles.modalTitle}>Lisans Bilgileri</Text>
-                <Text style={modalStyles.modalText}>{getLisansBilgisiIcerigi()}</Text>
-                
+                <Text style={modalStyles.modalText}>
+                  {getLisansBilgisiIcerigi()}
+                </Text>
+
                 <View style={modalStyles.buttonContainer}>
                   {lisansBilgisi?.tip === "ucretsiz" && (
                     <TouchableOpacity
@@ -241,7 +274,7 @@ export default function AnaMenu() {
                       <Text style={modalStyles.buttonText}>Tam Sürüme Geç</Text>
                     </TouchableOpacity>
                   )}
-                  
+
                   <TouchableOpacity
                     style={[modalStyles.button, modalStyles.buttonClose]}
                     onPress={() => setModalVisible(false)}
@@ -264,7 +297,7 @@ const modalStyles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: 'rgba(0, 0, 0, 0.5)', // Yarı saydam arka plan
+    backgroundColor: "rgba(0, 0, 0, 0.5)", // Yarı saydam arka plan
   },
   modalView: {
     margin: 20,
@@ -275,12 +308,12 @@ const modalStyles = StyleSheet.create({
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
-      height: 2
+      height: 2,
     },
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
-    width: '85%',
+    width: "85%",
     maxWidth: 400,
   },
   modalTitle: {
