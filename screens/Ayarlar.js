@@ -9,10 +9,17 @@ import {
   TouchableOpacity,
   TextInput,
   Alert,
+  Dimensions,
+  Platform,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useTema } from "../contexts/ThemeContext"; // ThemeContext'ten useTema hook'unu import ediyoruz
+
+// Ekran genişliğini al
+const screenWidth = Dimensions.get('window').width;
+// Küçük ekranlar için kontrol (Samsung Galaxy A51 gibi)
+const isSmallScreen = screenWidth < 380;
 
 export default function Ayarlar({ navigation }) {
   // ThemeContext'ten tema bilgilerini al
@@ -123,13 +130,18 @@ export default function Ayarlar({ navigation }) {
       borderBottomWidth: 1,
       borderBottomColor: tema.sinir,
       paddingBottom: 8,
+      flexWrap: 'wrap', // Satır sığmazsa alt satıra geç
+      justifyContent: 'space-between', // Öğeleri yatayda dağıt
+    },
+    ayarBaslikIcon: {
+      marginRight: 8,
     },
     ayarBaslikText: {
-      fontSize: 18,
+      fontSize: isSmallScreen ? 16 : 18,
       fontWeight: "600",
-      marginLeft: 8,
-      flex: 1,
       color: tema.metin,
+      flex: isSmallScreen ? undefined : 1, // Küçük ekranlarda flex kullanma
+      marginRight: isSmallScreen ? 8 : 0, // Küçük ekranlarda sağ margin ekle
     },
     ayarSatir: {
       flexDirection: "row",
@@ -161,6 +173,17 @@ export default function Ayarlar({ navigation }) {
       color: tema.metin,
       backgroundColor: tema.girdi,
     },
+    // Başlık içeriği için container
+    baslikIcerik: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flex: isSmallScreen ? undefined : 1,
+    },
+    // Buton container'ı
+    butonContainer: {
+      marginTop: isSmallScreen ? 8 : 0,
+      alignSelf: isSmallScreen ? 'flex-end' : undefined,
+    }
   });
 
   return (
@@ -168,12 +191,15 @@ export default function Ayarlar({ navigation }) {
       {/* Tema Ayarı */}
       <View style={dinamikStiller.ayarKart}>
         <View style={dinamikStiller.ayarBaslik}>
-          <MaterialCommunityIcons
-            name="theme-light-dark"
-            size={24}
-            color={tema.vurgu}
-          />
-          <Text style={dinamikStiller.ayarBaslikText}>Tema Ayarları</Text>
+          <View style={dinamikStiller.baslikIcerik}>
+            <MaterialCommunityIcons
+              name="theme-light-dark"
+              size={24}
+              color={tema.vurgu}
+              style={dinamikStiller.ayarBaslikIcon}
+            />
+            <Text style={dinamikStiller.ayarBaslikText}>Tema Ayarları</Text>
+          </View>
         </View>
 
         <View style={dinamikStiller.ayarSatir}>
@@ -190,27 +216,32 @@ export default function Ayarlar({ navigation }) {
       {/* Özel Alanlar */}
       <View style={dinamikStiller.ayarKart}>
         <View style={dinamikStiller.ayarBaslik}>
-          <MaterialCommunityIcons
-            name="form-textbox"
-            size={24}
-            color={tema.vurgu}
-          />
-          <Text style={dinamikStiller.ayarBaslikText}>Özel Alanlar</Text>
+          <View style={dinamikStiller.baslikIcerik}>
+            <MaterialCommunityIcons
+              name="form-textbox"
+              size={24}
+              color={tema.vurgu}
+              style={dinamikStiller.ayarBaslikIcon}
+            />
+            <Text style={dinamikStiller.ayarBaslikText}>Özel Alanlar</Text>
+          </View>
 
-          <TouchableOpacity
-            style={[styles.duzenleButon, { backgroundColor: tema.vurgu }]}
-            onPress={() => {
-              if (duzenlemeModu) {
-                degisiklikleriKaydet();
-              } else {
-                setDuzenlemeModu(true);
-              }
-            }}
-          >
-            <Text style={styles.duzenleButonText}>
-              {duzenlemeModu ? "Kaydet" : "Düzenle"}
-            </Text>
-          </TouchableOpacity>
+          <View style={dinamikStiller.butonContainer}>
+            <TouchableOpacity
+              style={[styles.duzenleButon, { backgroundColor: tema.vurgu }]}
+              onPress={() => {
+                if (duzenlemeModu) {
+                  degisiklikleriKaydet();
+                } else {
+                  setDuzenlemeModu(true);
+                }
+              }}
+            >
+              <Text style={styles.duzenleButonText}>
+                {duzenlemeModu ? "Kaydet" : "Düzenle"}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         <Text style={dinamikStiller.bilgiText}>
@@ -244,8 +275,15 @@ export default function Ayarlar({ navigation }) {
       {/* Lisans Bilgileri */}
       <View style={dinamikStiller.ayarKart}>
         <View style={dinamikStiller.ayarBaslik}>
-          <MaterialCommunityIcons name="license" size={24} color={tema.vurgu} />
-          <Text style={dinamikStiller.ayarBaslikText}>Lisans Bilgileri</Text>
+          <View style={dinamikStiller.baslikIcerik}>
+            <MaterialCommunityIcons 
+              name="license" 
+              size={24} 
+              color={tema.vurgu}
+              style={dinamikStiller.ayarBaslikIcon}
+            />
+            <Text style={dinamikStiller.ayarBaslikText}>Lisans Bilgileri</Text>
+          </View>
         </View>
 
         <TouchableOpacity style={styles.lisansButon}>
@@ -262,10 +300,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 4,
+    minWidth: 80, // Minimum genişlik
+    alignItems: 'center', // İçeriği ortala
   },
   duzenleButonText: {
     color: "white",
     fontWeight: "500",
+    fontSize: 14, // Daha küçük font boyutu
   },
   lisansButon: {
     backgroundColor: "#007bff",

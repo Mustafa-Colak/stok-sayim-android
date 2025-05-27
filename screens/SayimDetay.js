@@ -353,8 +353,6 @@ export default function SayimDetay({ route, navigation }) {
       barkod: barkod.trim(),
       miktar: hizliMod ? 1 : parseInt(miktar) || 1,
       not: hizliMod ? "" : not.trim(), // Hızlı modda not alanını boş bırak
-      ad: "", // Ürün adı (notu) şu an girilmediği için boş bırakıyoruz, raporlama için eklendi
-      // Özel alanları ekle
       ozelAlanlar: { ...alanDegerleri },
     };
 
@@ -378,7 +376,7 @@ export default function SayimDetay({ route, navigation }) {
     // Alanları temizle - miktar hariç
     setBarkod("");
     setNot(""); // Not alanını temizle
-    
+
     // Özel alanları temizle
     const yeniDegerler = {};
     ozelAlanlar.forEach((alan) => {
@@ -660,8 +658,8 @@ export default function SayimDetay({ route, navigation }) {
     },
     limitBilgisi: {
       fontSize: 12,
-      color: (urunler.length >= 45) ? "#dc3545" : tema.ikincilMetin,
-      fontWeight: (urunler.length >= 45) ? "bold" : "normal",
+      color: urunler.length >= 45 ? "#dc3545" : tema.ikincilMetin,
+      fontWeight: urunler.length >= 45 ? "bold" : "normal",
     },
     sonlandirBtn: {
       backgroundColor: karanlikTema ? "#6c757d" : "gray",
@@ -689,7 +687,7 @@ export default function SayimDetay({ route, navigation }) {
       padding: 12,
       borderRadius: 4,
       marginBottom: 10,
-    }
+    },
   });
 
   // Yükleniyor durumu
@@ -719,8 +717,13 @@ export default function SayimDetay({ route, navigation }) {
           <Switch
             value={hizliMod}
             onValueChange={modTercihiniKaydet}
-            trackColor={{ false: karanlikTema ? "#555" : "#767577", true: karanlikTema ? "#3a6ea5" : "#81b0ff" }}
-            thumbColor={hizliMod ? tema.buton : karanlikTema ? "#f4f3f4" : "#f4f3f4"}
+            trackColor={{
+              false: karanlikTema ? "#555" : "#767577",
+              true: karanlikTema ? "#3a6ea5" : "#81b0ff",
+            }}
+            thumbColor={
+              hizliMod ? tema.buton : karanlikTema ? "#f4f3f4" : "#f4f3f4"
+            }
             disabled={aktifAlanVarMi} // Aktif alan varsa hızlı mod seçilemez
           />
         </View>
@@ -736,7 +739,9 @@ export default function SayimDetay({ route, navigation }) {
             style={dinamikStiller.tamSurumeGecBtn}
             onPress={() => navigation.navigate("Ayarlar")}
           >
-            <Text style={dinamikStiller.tamSurumeGecBtnText}>Tam Sürüme Geç</Text>
+            <Text style={dinamikStiller.tamSurumeGecBtnText}>
+              Tam Sürüme Geç
+            </Text>
           </TouchableOpacity>
         </View>
       )}
@@ -785,19 +790,21 @@ export default function SayimDetay({ route, navigation }) {
         {!hizliMod && (
           <View style={dinamikStiller.inputRow}>
             <Text style={dinamikStiller.inputLabel}>Not:</Text>
-            <View style={{flex: 1, flexDirection: 'row'}}>
+            <View style={{ flex: 1, flexDirection: "row" }}>
               <TextInput
                 value={not}
                 onChangeText={setNot}
                 placeholder="Not (opsiyonel)"
                 placeholderTextColor={tema.ikincilMetin}
-                style={[dinamikStiller.input, {marginRight: 8}]}
+                style={[dinamikStiller.input, { marginRight: 8 }]}
                 returnKeyType="next"
                 blurOnSubmit={false}
               />
-              
+
               <View style={dinamikStiller.miktarContainer}>
-                <Text style={[dinamikStiller.inputLabel, {width: 55}]}>Miktar:</Text>
+                <Text style={[dinamikStiller.inputLabel, { width: 55 }]}>
+                  Miktar:
+                </Text>
                 <TextInput
                   value={miktar}
                   onChangeText={setMiktar}
@@ -821,7 +828,11 @@ export default function SayimDetay({ route, navigation }) {
           onPress={klavyeyiAc}
           activeOpacity={0.7}
         >
-          <MaterialCommunityIcons name="keyboard" size={22} color={tema.butonMetin} />
+          <MaterialCommunityIcons
+            name="keyboard"
+            size={22}
+            color={tema.butonMetin}
+          />
           <Text style={dinamikStiller.addText}>Klavyeyi Aç</Text>
         </TouchableOpacity>
       )}
@@ -846,10 +857,19 @@ export default function SayimDetay({ route, navigation }) {
               ? ` (Son ${gosterilecekUrunler.length} gösteriliyor)`
               : ""}
           </Text>
-          <Text style={[
-            dinamikStiller.limitBilgisi,
-            { color: urunler.length >= 45 ? (karanlikTema ? "#ff6b6b" : "#dc3545") : tema.ikincilMetin }
-          ]}>
+          <Text
+            style={[
+              dinamikStiller.limitBilgisi,
+              {
+                color:
+                  urunler.length >= 45
+                    ? karanlikTema
+                      ? "#ff6b6b"
+                      : "#dc3545"
+                    : tema.ikincilMetin,
+              },
+            ]}
+          >
             {urunler.length >= 40 && urunler.length < 50
               ? `Limit: ${urunler.length}/50 ürün`
               : ""}
@@ -861,9 +881,13 @@ export default function SayimDetay({ route, navigation }) {
         ref={flatListRef}
         data={gosterilecekUrunler}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <UrunSatiri item={item} onSil={urunSil} tema={tema} />}
+        renderItem={({ item }) => (
+          <UrunSatiri item={item} onSil={urunSil} tema={tema} />
+        )}
         ListEmptyComponent={
-          <Text style={dinamikStiller.subtitle}>Bu sayımda henüz ürün yok.</Text>
+          <Text style={dinamikStiller.subtitle}>
+            Bu sayımda henüz ürün yok.
+          </Text>
         }
         ItemSeparatorComponent={() => <View style={dinamikStiller.separator} />}
         style={{ flex: 1, marginTop: 10 }}
@@ -883,7 +907,11 @@ export default function SayimDetay({ route, navigation }) {
           onPress={sayimiSonlandir}
           activeOpacity={0.7}
         >
-          <MaterialCommunityIcons name="lock-check" size={22} color={tema.butonMetin} />
+          <MaterialCommunityIcons
+            name="lock-check"
+            size={22}
+            color={tema.butonMetin}
+          />
           <Text style={dinamikStiller.addText}>Sayımı Sonlandır</Text>
         </TouchableOpacity>
       )}
@@ -893,7 +921,11 @@ export default function SayimDetay({ route, navigation }) {
           onPress={sayimaDevamEt}
           activeOpacity={0.7}
         >
-          <MaterialCommunityIcons name="refresh" size={22} color={tema.butonMetin} />
+          <MaterialCommunityIcons
+            name="refresh"
+            size={22}
+            color={tema.butonMetin}
+          />
           <Text style={dinamikStiller.addText}>Devam Et</Text>
         </TouchableOpacity>
       )}

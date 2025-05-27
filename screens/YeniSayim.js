@@ -56,7 +56,7 @@ export default function YeniSayim({ navigation }) {
 
     const yeniSayim = {
       id: yeniId,
-      not: sayimNotuTarihli, // 'ad' alanını 'not' olarak değiştirdik
+      not: sayimNotuTarihli,
       durum: "baslamamis",
       tarih: now.toISOString(), // Tarihi ISO formatında kaydet
       urunSayisi: 0, // Başlangıç ürün sayısını 0 olarak ayarla

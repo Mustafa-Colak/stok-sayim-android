@@ -20,6 +20,7 @@ expo-env.d.ts
 
 # Metro
 .metro-health-check*
+metro.config.js
 
 # debug
 npm-debug.*
@@ -35,3 +36,15 @@ yarn-error.*
 
 # typescript
 *.tsbuildinfo
+
+# Android build files
+android/app/src/main/assets/
+android/app/src/main/res/raw/
+android/app/src/main/res/drawable*/node_modules_*
+
+# IDE history
+.history/
+.history/**/*
+
+# Backup files
+**/Ayarlar2.js
