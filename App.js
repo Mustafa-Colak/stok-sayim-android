@@ -6,13 +6,18 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { View, Text, Image, StyleSheet, TouchableOpacity } from "react-native";
 import { ThemeProvider, useTema } from "./contexts/ThemeContext";
 
-import GirisEkrani from "./screens/GirisEkrani";
+// GirisEkrani yerine LoginScreen'i import ediyoruz
+import LoginScreen from "./screens/LoginScreen";
 import AnaMenu from "./screens/AnaMenu";
 import SayimListesi from "./screens/SayimListesi";
 import SayimDetay from "./screens/SayimDetay";
 import RaporOlustur from "./screens/RaporOlustur";
 import YeniSayim from "./screens/YeniSayim";
-import Ayarlar from "./screens/Ayarlar"; // Yeni Ayarlar ekranını import et
+import Ayarlar from "./screens/Ayarlar";
+// Diğer ekranları da import edelim
+import RegisterScreen from "./screens/RegisterScreen";
+import ForgotPasswordScreen from "./screens/ForgotPasswordScreen";
+import ProfileScreen from "./screens/ProfileScreen";
 
 const Stack = createStackNavigator();
 
@@ -51,12 +56,45 @@ const MainApp = () => {
         })}
       >
         <Stack.Screen
-          name="Giris"
-          component={GirisEkrani}
+          name="Login"
+          component={LoginScreen}
           options={{
             title: "Giriş",
             // Giriş ekranında geri butonu yok
           }}
+        />
+
+        <Stack.Screen
+          name="Register"
+          component={RegisterScreen}
+          options={({ navigation }) => ({
+            title: "Hesap Oluştur",
+            headerRight: () => (
+              <CustomBackButton onPress={() => navigation.goBack()} />
+            ),
+          })}
+        />
+
+        <Stack.Screen
+          name="ForgotPassword"
+          component={ForgotPasswordScreen}
+          options={({ navigation }) => ({
+            title: "Şifremi Unuttum",
+            headerRight: () => (
+              <CustomBackButton onPress={() => navigation.goBack()} />
+            ),
+          })}
+        />
+
+        <Stack.Screen
+          name="Profile"
+          component={ProfileScreen}
+          options={({ navigation }) => ({
+            title: "Profil",
+            headerRight: () => (
+              <CustomBackButton onPress={() => navigation.goBack()} />
+            ),
+          })}
         />
 
         <Stack.Screen

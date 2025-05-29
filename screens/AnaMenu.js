@@ -1,4 +1,3 @@
-// e:\edev\stok-sayim\screens\AnaMenu.js
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -13,6 +12,7 @@ import {
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 import { useTema } from "../contexts/ThemeContext"; // ThemeContext'i import et
+import AsyncStorage from "@react-native-async-storage/async-storage"; // AsyncStorage'ı import et
 import {
   lisansBilgisiYukle,
   denemeSuresiniKontrolEt,
@@ -88,6 +88,61 @@ export default function AnaMenu() {
     } else {
       console.warn("Ekran adı tanımlanmamış.");
     }
+  };
+
+  // Debug bilgilerini gösteren fonksiyon
+  const debugUserData = async () => {
+    try {
+      const userDataString = await AsyncStorage.getItem("user_data");
+      const lastLoginTime = await AsyncStorage.getItem("last_login_time");
+      
+      Alert.alert(
+        "Debug Bilgileri",
+        `Kullanıcı Verileri: ${userDataString ? JSON.stringify(JSON.parse(userDataString), null, 2) : "Yok"}\n\nSon Giriş: ${lastLoginTime || "Yok"}`
+      );
+    } catch (error) {
+      console.error("Debug hatası:", error);
+      Alert.alert("Hata", "Debug bilgileri alınamadı.");
+    }
+  };
+
+  // Çıkış yapma fonksiyonu
+  const handleLogout = () => {
+    Alert.alert(
+      "Çıkış Yap",
+      "Hesabınızdan çıkış yapmak istediğinize emin misiniz?",
+      [
+        {
+          text: "İptal",
+          style: "cancel",
+        },
+        {
+          text: "Çıkış Yap",
+          onPress: async () => {
+            try {
+              console.log("Çıkış yapılıyor...");
+
+              // Oturum bilgilerini temizle
+              await AsyncStorage.removeItem("last_login_time");
+
+              // Kullanıcı verilerini tamamen sil
+              await AsyncStorage.removeItem("user_data");
+
+              console.log("Çıkış yapıldı, Login ekranına yönlendiriliyor...");
+
+              // Login ekranına yönlendir
+              navigation.reset({
+                index: 0,
+                routes: [{ name: "Login" }],
+              });
+            } catch (error) {
+              console.error("Çıkış yapma hatası:", error);
+              Alert.alert("Hata", "Çıkış yapılırken bir hata oluştu.");
+            }
+          },
+        },
+      ]
+    );
   };
 
   // Lisans bilgilerini göster - Güvenlik kontrolü ekledik
@@ -236,6 +291,13 @@ export default function AnaMenu() {
       lineHeight: 24,
       color: tema.metin,
     },
+    logoutButton: {
+      backgroundColor: "#dc3545",
+      marginTop: 20,
+    },
+    logoutText: {
+      color: "#fff",
+    },
   });
 
   return (
@@ -255,7 +317,9 @@ export default function AnaMenu() {
             />
             <View style={{ flex: 1, marginLeft: 16 }}>
               <Text style={dinamikStiller.kartBaslik}>{item.title}</Text>
-              <Text style={dinamikStiller.kartAciklama}>{item.description}</Text>
+              <Text style={dinamikStiller.kartAciklama}>
+                {item.description}
+              </Text>
             </View>
           </TouchableOpacity>
         ))}
@@ -305,6 +369,51 @@ export default function AnaMenu() {
             size={24}
             color={tema.ikincilMetin}
           />
+        </TouchableOpacity>
+
+        {/* Debug Butonu - Sadece geliştirme modunda göster */}
+        {__DEV__ && (
+          <TouchableOpacity
+            style={[
+              dinamikStiller.kart,
+              { backgroundColor: "#6c757d", marginTop: 20 }
+            ]}
+            onPress={debugUserData}
+          >
+            <MaterialCommunityIcons
+              name="bug"
+              size={30}
+              color="#fff"
+            />
+            <View style={{ flex: 1, marginLeft: 16 }}>
+              <Text style={[dinamikStiller.kartBaslik, { color: "#fff" }]}>
+                Debug Bilgileri
+              </Text>
+              <Text style={[dinamikStiller.kartAciklama, { color: "#ddd" }]}>
+                Kullanıcı verilerini ve oturum durumunu kontrol et
+              </Text>
+            </View>
+          </TouchableOpacity>
+        )}
+
+        {/* Çıkış Yap Butonu */}
+        <TouchableOpacity
+          style={[dinamikStiller.kart, dinamikStiller.logoutButton]}
+          onPress={handleLogout}
+        >
+          <MaterialCommunityIcons name="logout" size={30} color="#fff" />
+          <View style={{ flex: 1, marginLeft: 16 }}>
+            <Text
+              style={[dinamikStiller.kartBaslik, dinamikStiller.logoutText]}
+            >
+              Çıkış Yap
+            </Text>
+            <Text
+              style={[dinamikStiller.kartAciklama, dinamikStiller.logoutText]}
+            >
+              Hesabınızdan güvenli çıkış yapın
+            </Text>
+          </View>
         </TouchableOpacity>
       </ScrollView>
 
